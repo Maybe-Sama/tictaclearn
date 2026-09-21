@@ -1,0 +1,47 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.2, .9, .3, 1.2)",
+        "createdAt": "2026-09-21T04:24:54.538Z",
+        "reason": "Claude: overshoot is the requested game-feel (brief asks for squash/stretch, anticipation/impact, expressive cartoon rhythm-game motion)"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.3, 1.6, .5, 1)",
+        "createdAt": "2026-09-21T04:24:54.558Z",
+        "reason": "Claude: overshoot is the requested game-feel (brief asks for squash/stretch, anticipation/impact, expressive cartoon rhythm-game motion)"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.3, 1.4, .5, 1)",
+        "createdAt": "2026-09-21T04:24:54.579Z",
+        "reason": "Claude: overshoot is the requested game-feel (brief asks for squash/stretch, anticipation/impact, expressive cartoon rhythm-game motion)"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(0.3, 1.8, 0.5, 1)",
+        "createdAt": "2026-09-21T04:24:54.598Z",
+        "reason": "Claude: overshoot is the requested game-feel (brief asks for squash/stretch, anticipation/impact, expressive cartoon rhythm-game motion)"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(0.3, 1.6, 0.5, 1)",
+        "createdAt": "2026-09-21T04:24:54.615Z",
+        "reason": "Claude: overshoot is the requested game-feel (brief asks for squash/stretch, anticipation/impact, expressive cartoon rhythm-game motion)"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/style.css"
+        ],
+        "createdAt": "2026-09-21T04:24:54.632Z",
+        "reason": "Claude: false positive - the only match is .flag-label::before, a rotated square forming a speech-bubble tail, not a card accent border"
+      }
+    ]
+  }
+}
