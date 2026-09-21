@@ -1,5 +1,6 @@
 import type { ContentPack, LearningItem } from '../content/types';
 import { GLOBE_SVG } from './art';
+import { TOUCH, inputWord } from './layout';
 import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyId } from '../game/Difficulty';
 
 function el<T extends HTMLElement = HTMLDivElement>(cls: string, html = '', tag = 'div'): T {
@@ -47,7 +48,7 @@ export class Menu {
          <button class="btn-level2" type="button">GROOVE 2 · GEMELAS <small>2</small></button>
          <button class="btn-calibrate" type="button">AJUSTAR RITMO <small>C</small></button>
        </div>
-       <p class="menu-hint">Golpea los tambores… y el país de la bandera. Todo con <kbd>ESPACIO</kbd>, al ritmo.</p>
+       <p class="menu-hint">Golpea los tambores… y el país de la bandera. ${TOUCH ? 'Toca la pantalla' : 'Todo con <kbd>ESPACIO</kbd>'}, al ritmo.</p>
        <p class="menu-best"></p>`,
     );
     host.appendChild(this.root);
@@ -245,7 +246,7 @@ export class CalibrationScreen {
   }
 
   setStatus(text: string): void {
-    this.status.textContent = text;
+    this.status.textContent = inputWord(text);
   }
 
   beat(accent: boolean): void {

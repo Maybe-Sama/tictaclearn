@@ -88,6 +88,7 @@ export class Game {
     ui.results.onAgain = () => this.start(this.level, true);
     ui.results.onRestart = () => this.toMenu();
     ui.pause.onResume = () => this.resume();
+    ui.stage.onPause = () => this.pause();
     ui.pause.onRestart = () => this.toMenu();
     ui.calib.onDone = () => this.toMenu();
     ui.calib.onRetry = () => this.startCalibration();

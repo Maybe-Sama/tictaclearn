@@ -1,3 +1,5 @@
+import { L } from './layout';
+
 type Shape = 'star' | 'dot' | 'rect';
 
 interface P {
@@ -17,7 +19,7 @@ interface P {
 
 export const PARTY = ['#FF5D8F', '#FFD23F', '#16C2A3', '#4FB3FF', '#A98BFF', '#FF8C42', '#FFFFFF'];
 
-/** Tiny canvas particle system in stage coordinates (1600x900). */
+/** Tiny canvas particle system in stage coordinates (active layout). */
 export class Particles {
   private c: CanvasRenderingContext2D;
   private ps: P[] = [];
@@ -31,8 +33,8 @@ export class Particles {
 
   resize(scale: number): void {
     const k = Math.min(2, window.devicePixelRatio || 1) * scale;
-    this.canvas.width = Math.round(1600 * k);
-    this.canvas.height = Math.round(900 * k);
+    this.canvas.width = Math.round(L.w * k);
+    this.canvas.height = Math.round(L.h * k);
     this.c.setTransform(k, 0, 0, k, 0, 0);
   }
 
@@ -66,7 +68,7 @@ export class Particles {
     for (let i = 0; i < count; i++) {
       const life = 2 + Math.random() * 1.5;
       this.ps.push({
-        x: Math.random() * 1600,
+        x: Math.random() * L.w,
         y: -40 - Math.random() * 300,
         vx: (Math.random() - 0.5) * 120,
         vy: 180 + Math.random() * 260,
@@ -88,7 +90,7 @@ export class Particles {
 
   update(dt: number): void {
     const c = this.c;
-    c.clearRect(0, 0, 1600, 900);
+    c.clearRect(0, 0, L.w, L.h);
     if (!this.ps.length) return;
     for (let i = this.ps.length - 1; i >= 0; i--) {
       const p = this.ps[i];

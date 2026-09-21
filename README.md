@@ -9,6 +9,10 @@ Prototipo jugable de un juego de ritmo educativo: **golpea los tambores… y el 
 
 Mecánicas: tambores (siempre se golpean), tambores «y» a contratiempo, ráfagas (una bandera por compás), bandera flash (se tapa), tambores a ciegas, doble golpe. La banda suma capas con tu combo (8 / 16 / 30 = FEVER, puntos ×2) y se apaga un momento cuando fallas. Una dificultad dinámica invisible elige las plantillas del Mix y el Final según cómo juegas.
 
+## Móvil y tablet
+
+Dos composiciones del escenario: horizontal 16:9 y vertical 9:16 (móvil de pie), elegida automáticamente al girar o redimensionar (`src/ui/layout.ts`). En pantallas táctiles se toca en cualquier parte para golpear, hay botón de pausa y los textos dicen TOCA en vez de ESPACIO.
+
 ## Ejecutar
 
 ```bash

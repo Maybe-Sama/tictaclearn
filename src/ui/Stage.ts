@@ -4,11 +4,9 @@ import type { ChallengeOption, CueKind, Judgement, TextStyle } from '../rhythm/t
 import { GameState } from '../game/GameStateMachine';
 import { PARTY, type Particles } from './Particles';
 import { PLANET_SVG, STAMP_SVG } from './art';
+import { L, inputWord } from './layout';
 
-/** Stage is a fixed 1600x900 canvas scaled to fit. */
-export const PAD_X = 560;
-export const LANE_Y = 712;
-const SPACING = 250;
+/** Stage coordinates come from the active layout (landscape or portrait). */
 const HOP_HEIGHT = 34;
 
 const SECTION_NAMES: Partial<Record<GameState, string>> = {
@@ -90,23 +88,24 @@ export class Stage {
         <div class="pill section-pill"><span class="note">♪</span><span class="section-name"></span></div>
         <div class="pill score-pill"><span class="score-num">0</span></div>
       </div>
+      <button class="btn-pause" type="button" aria-label="Pausa"><i></i><i></i></button>
       <div class="dj" aria-hidden="true"><div class="dj-body">${PLANET_SVG}</div><div class="dj-shadow"></div></div>
       <div class="combo"><b class="combo-num">0</b><span>COMBO</span></div>
       <div class="milestone"></div>
       <div class="flag-stage"><div class="flag-slot"></div></div>
       <div class="count-row" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span></div>
-      <div class="flag-label"></div>
+      <div class="label-anchor"><div class="flag-label"></div></div>
       <div class="lane" aria-hidden="true">
         <div class="track"></div>
-        ${[-2, -1, 1, 2, 3].map((k) => `<i class="dot" style="left:${PAD_X + k * SPACING}px"></i>`).join('')}
-        <div class="pad" style="left:${PAD_X}px"><i></i></div>
+        ${[-2, -1, 1, 2, 3].map((k) => `<i class="dot" style="--k:${k}"></i>`).join('')}
+        <div class="pad"><i></i></div>
       </div>
       <div class="tokens"></div>
-      <div class="stamp" style="left:${PAD_X}px">${STAMP_SVG}</div>
+      <div class="stamp">${STAMP_SVG}</div>
       <div class="judge" role="status" aria-live="polite"><b></b><span></span></div>
       <div class="mini-judge" aria-hidden="true"></div>
       <div class="fever-badge" aria-hidden="true">FEVER <b>×2</b></div>
-      <div class="keycap" style="left:${PAD_X}px"><span>ESPACIO</span></div>
+      <div class="keycap"><span>${inputWord('ESPACIO')}</span></div>
       <div class="banners"></div>`;
     host.appendChild(this.root);
     const q = <T extends Element>(s: string): T => this.root.querySelector(s) as T;
@@ -127,7 +126,14 @@ export class Stage {
     this.dj = q('.dj');
     this.sectionName = q('.section-name');
     this.scoreNum = q('.score-num');
+    q<HTMLButtonElement>('.btn-pause').addEventListener('click', (e) => {
+      e.stopPropagation();
+      (e.currentTarget as HTMLButtonElement).blur();
+      this.onPause();
+    });
   }
+
+  onPause: () => void = () => {};
 
   show(v: boolean): void {
     this.root.classList.toggle('hidden', !v);
@@ -196,8 +202,8 @@ export class Stage {
         }
         if (tok.detached) continue;
         const h = hop(b, this.reduced, o.offbeat);
-        const x = PAD_X + SPACING * h.pos;
-        const y = LANE_Y - HOP_HEIGHT * h.lift;
+        const x = L.padX + L.spacing * h.pos;
+        const y = L.laneY - HOP_HEIGHT * h.lift;
         const near = Math.max(0, 1 - Math.abs(b) / 0.6);
         const s = 0.88 + 0.22 * near;
         const op = b > 3.2 ? (3.7 - b) / 0.5 : b < -1.5 ? Math.max(0, (b + 2.3) / 0.8) : 1;
@@ -250,7 +256,7 @@ export class Stage {
     group.appendChild(this.flagCard(item));
     this.swapFlag(group);
     this.setLabel(this.pack.answerLabel(item), 'teach');
-    this.fx.burst(PAD_X, 312, { n: 10, shape: 'star', speed: 520, size: 16 });
+    this.fx.burst(L.flagX, L.flagY, { n: 10, shape: 'star', speed: 520, size: 16 });
   }
 
   /** Flash: the flag flips to a "?" card. The eyes stay, peeking. */
@@ -348,8 +354,8 @@ export class Stage {
     const el = document.createElement('div');
     el.className = `banner ${style}`;
     el.innerHTML = `<h1></h1>${sub ? '<p></p>' : ''}`;
-    el.querySelector('h1')!.textContent = text;
-    if (sub) el.querySelector('p')!.textContent = sub;
+    el.querySelector('h1')!.textContent = inputWord(text);
+    if (sub) el.querySelector('p')!.textContent = inputWord(sub);
     host.appendChild(el);
     const inMs = style === 'top' ? 260 : 420;
     const total = Math.max(inMs + 300, durSec * 1000);
@@ -402,7 +408,7 @@ export class Stage {
       const sub = perfect || j.side === 'center' ? '' : j.side === 'early' ? 'early' : 'late';
       this.judgeText(perfect ? 'PERFECT!' : 'GOOD', sub, perfect ? 'perfect' : 'good');
       this.pad.animate([{ transform: 'translate(-50%,-50%) scale(1.25)', filter: 'brightness(1.4)' }, { transform: 'translate(-50%,-50%) scale(1)', filter: 'none' }], { duration: 260, easing: 'ease-out' });
-      this.fx.burst(PAD_X, LANE_Y - 20, perfect ? { n: 18, shape: 'star', speed: 640, size: 18 } : { n: 8, shape: 'dot', speed: 380, size: 12 });
+      this.fx.burst(L.padX, L.laneY - 20, perfect ? { n: 18, shape: 'star', speed: 640, size: 18 } : { n: 8, shape: 'dot', speed: 380, size: 12 });
       this.flagReact(perfect ? 'perfect' : 'good');
       if (tok) this.tokenHit(tok, perfect);
       if (perfect && !this.reduced) this.root.animate([{ transform: 'scale(1.006)' }, { transform: 'scale(1)' }], { duration: 160 });
@@ -450,7 +456,7 @@ export class Stage {
     );
     if (hit) {
       this.pad.animate([{ transform: 'translate(-50%,-50%) scale(1.12)' }, { transform: 'translate(-50%,-50%) scale(1)' }], { duration: 160, easing: 'ease-out' });
-      this.fx.burst(PAD_X, LANE_Y - 10, { n: j.grade === 'perfect' ? 7 : 4, shape: 'dot', speed: 360, size: 10, life: 0.45 });
+      this.fx.burst(L.padX, L.laneY - 10, { n: j.grade === 'perfect' ? 7 : 4, shape: 'dot', speed: 360, size: 10, life: 0.45 });
       this.flagBob();
       if (tok) {
         tok.detached = true;
@@ -560,7 +566,7 @@ export class Stage {
           ],
           { duration: 1100, easing: 'ease-out' },
         );
-        this.fx.burst(1390, 230, { n: 26, shape: 'rect', speed: 700, size: 16, colors: PARTY });
+        this.fx.burst(L.djX, L.djY + 30, { n: 26, shape: 'rect', speed: 700, size: 16, colors: PARTY });
       }
     } else if (n === 0 && prev >= 5) {
       this.comboEl.classList.add('lost');
@@ -574,7 +580,7 @@ export class Stage {
     document.body.classList.toggle('fever-mode', on);
     if (on) {
       this.showText('FEVER!', 'puntos ×2', 'big', 1.1);
-      this.fx.burst(PAD_X, 312, { n: 50, shape: 'star', speed: 1000, size: 22 });
+      this.fx.burst(L.flagX, L.flagY, { n: 50, shape: 'star', speed: 1000, size: 22 });
       this.fx.rain(60);
     }
   }
@@ -606,7 +612,7 @@ export class Stage {
 
   finale(bigWin: boolean): void {
     this.fx.rain(bigWin ? 160 : 90);
-    this.fx.burst(PAD_X, 312, { n: 40, shape: 'star', speed: 900, size: 22 });
+    this.fx.burst(L.flagX, L.flagY, { n: 40, shape: 'star', speed: 900, size: 22 });
     this.dj.animate([{ transform: 'rotate(0) scale(1)' }, { transform: 'rotate(360deg) scale(1.3)' }, { transform: 'rotate(360deg) scale(1)' }], { duration: 900, easing: 'ease-out' });
   }
 }
