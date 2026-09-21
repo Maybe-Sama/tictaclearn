@@ -1,9 +1,10 @@
-# WORLD BEAT · Banderas
+# WORLD BEAT · Banderas y Capitales
 
 Prototipo jugable de un juego de ritmo educativo: **golpea los tambores… y el país de la bandera**, todo con una tecla y al ritmo.
 
-- **Groove 1** (JUGAR): tutorial → Easy → Nuevo → Mix → Final, 8 banderas.
-- **Groove 2 · Gemelas** (tecla `2`): banderas que se confunden (Italia/México/Irlanda, Alemania/Bélgica, Polonia/Indonesia, Francia/Países Bajos).
+- **Asignatura** (↑/↓ o tocando en el menú): **Banderas** (bandera → país) o **Capitales** (bandera + país → capital).
+- **Groove 1** (JUGAR): tutorial → Easy → Nuevo → Mix → Final, 8 países.
+- **Groove 2** (tecla `2`): en Banderas, *Gemelas* (Italia/México/Irlanda, Alemania/Bélgica, Polonia/Indonesia, Francia/Países Bajos); en Capitales, *Trampas*: la capital no es la ciudad famosa, y la famosa pasa por el carril como señuelo (Canberra/Sídney, Ottawa/Toronto, Ankara/Estambul, Berna/Zúrich, Rabat/Casablanca, Washington/Nueva York, Ámsterdam/La Haya, Nueva Delhi/Bombay).
 - **Dificultad** (←/→ en el menú): FÁCIL · NORMAL · DIFÍCIL · EXPERTO. Cambia BPM (−12 % … +12 %), ventanas de timing (±200 ms … ±105 ms para GOOD), límites de la dificultad adaptativa, contratiempos/flash/doble/a ciegas, umbral de FEVER, tutorial y multiplicador de puntos. Récord separado por groove y dificultad. Todo en `src/game/Difficulty.ts`.
 - **Ajustar ritmo** (tecla `C`): 12 clics, pulsa con cada uno y guarda tu latencia.
 
@@ -45,4 +46,4 @@ npm run build    # typecheck + build de producción
 - **LearningTracker**: estadísticas por bandera (intentos, aciertos, errores de conocimiento/ritmo/sin respuesta, error medio de timing). Una bandera fallada vuelve con más peso unos 15–30 s después (repetición espaciada oculta).
 - **DifficultyDirector**: puntuación de habilidad invisible (países pesan mucho, tambores poco) → tier 0/1/2 → plantillas, patrones de tambor, flash y BPM.
 - **GameStateMachine** + **Setlist**: `Menu → RhythmTutorial → GuidedPractice → EasyGroove → TeachNewFlags → MixGroove → FinalGroove → Results`. El setlist es una secuencia de generadores, así que cada frase se construye justo antes de sonar y puede reaccionar a lo que acaba de pasar.
-- **Contenido** (`src/content`): `LearningItem` + `ContentPack` (`renderPrompt`, `answerLabel`). Para cambiar bandera→país por país→capital o palabra→traducción basta con otro pack, sin tocar el motor de ritmo.
+- **Contenido** (`src/content`): `LearningItem` (con `answer` y `decoys` opcionales) + `ContentPack` (`renderPrompt`, `promptCaption`, `answerLabel`, niveles y textos). `flags.ts` y `capitals.ts` son los dos packs; `index.ts` los registra. Una asignatura nueva (palabra→traducción, elemento→símbolo…) es otro pack, sin tocar el motor de ritmo.

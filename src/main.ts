@@ -1,5 +1,6 @@
 import './style.css';
 import { FLAGS_PACK } from './content/flags';
+import { PACKS } from './content/index';
 import { Game } from './game/Game';
 import { Input } from './input/Input';
 import { DebugPanel } from './ui/Debug';
@@ -27,12 +28,12 @@ canvas.className = 'fx';
 const fx = new Particles(canvas, reduced);
 const stage = new Stage(stageEl, FLAGS_PACK, fx, reduced);
 stageEl.appendChild(canvas);
-const menu = new Menu(stageEl, FLAGS_PACK);
+const menu = new Menu(stageEl, FLAGS_PACK, PACKS);
 const results = new ResultsScreen(stageEl, FLAGS_PACK);
 const pause = new PauseOverlay(stageEl);
 const calib = new CalibrationScreen(stageEl);
 
-const game = new Game(FLAGS_PACK, { stage, menu, results, pause, calib, fx, debug: debug ? new DebugPanel() : null }, { debug, autoplay });
+const game = new Game(PACKS, { stage, menu, results, pause, calib, fx, debug: debug ? new DebugPanel() : null }, { debug, autoplay });
 // Taps anywhere (letterbox bands included) count as hits.
 new Input(document.body).on((a, ts) => game.onAction(a, ts));
 

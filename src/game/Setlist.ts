@@ -1,16 +1,11 @@
-import type { ContentPack, LearningItem } from '../content/types';
+import type { ContentPack, LearningItem, LevelId } from '../content/types';
 import type { PhraseSource } from '../rhythm/RhythmEngine';
 import type { GrooveId, Phrase, PhraseEvent } from '../rhythm/types';
 import { OFFBEAT_PATTERNS, TEMPLATES, type ChallengeGenerator, type DrumPattern, type TemplateId } from './ChallengeGenerator';
 import type { DifficultyDirector, DifficultySettings } from './Difficulty';
 import { GameState } from './GameStateMachine';
 
-export type LevelId = 1 | 2;
-
-export const LEVELS: Record<LevelId, { name: string; items: string[] }> = {
-  1: { name: 'GROOVE 1', items: ['es', 'jp', 'fr', 'it', 'de', 'pt', 'gb', 'br'] },
-  2: { name: 'GROOVE 2 · GEMELAS', items: ['it', 'mx', 'ie', 'de', 'be', 'fr', 'nl', 'pl', 'id'] },
-};
+export type { LevelId };
 
 interface AdaptiveOpts {
   section: GameState;
@@ -50,7 +45,8 @@ export class Setlist implements PhraseSource {
     opts: { level: LevelId; skipTutorial: boolean },
   ) {
     if (opts.level === 2) {
-      this.sections = [() => this.twins(), () => this.mix2(), () => this.final2()];
+      const intro = pack.levels[2].intro === 'traps' ? () => this.traps() : () => this.twins();
+      this.sections = [intro, () => this.mix2(), () => this.final2()];
     } else {
       const all = [() => this.tutorial(), () => this.practice(), () => this.easy(), () => this.teachNew(), () => this.mix(), () => this.final()];
       this.sections = opts.skipTutorial ? all.slice(2) : all;
@@ -138,8 +134,8 @@ export class Setlist implements PhraseSource {
       ],
     });
     const demoText = (text: string, sub: string): PhraseEvent[] => [{ type: 'text', beat: 0, text, sub, style: 'top', beats: 7.6 }];
-    yield this.cg.challengePhrase('four', { targets: [jp], pool: g1, demo: true, hint: true, forceCorrect: [2], drums: 'pickup', bpm: 100, groove: 'intro', section: S, events: demoText('MIRA', 'tambores… ¡y SOLO su país!') });
-    yield this.cg.challengePhrase('four', { targets: [jp], pool: g1, demo: true, hint: true, forceCorrect: [1], drums: 'pickup', bpm: 100, groove: 'intro', section: S, events: demoText('¡OTRA!', 'los demás países, ni tocarlos') });
+    yield this.cg.challengePhrase('four', { targets: [jp], pool: g1, demo: true, hint: true, forceCorrect: [2], drums: 'pickup', bpm: 100, groove: 'intro', section: S, events: demoText('MIRA', `tambores… ¡y SOLO su ${this.pack.answerNoun}!`) });
+    yield this.cg.challengePhrase('four', { targets: [jp], pool: g1, demo: true, hint: true, forceCorrect: [1], drums: 'pickup', bpm: 100, groove: 'intro', section: S, events: demoText('¡OTRA!', 'lo demás, ni tocarlo') });
     yield this.banner('AHORA TÚ', 100, 'intro', 'go');
   }
 
@@ -148,7 +144,7 @@ export class Setlist implements PhraseSource {
     const g1 = this.group(1);
     this.practiceHits = 0;
     for (let n = 0; n < 4 && this.practiceHits < 2; n++) {
-      const events: PhraseEvent[] = n === 0 ? [{ type: 'section', beat: 0, state: GameState.GuidedPractice }, { type: 'text', beat: 0, text: 'TAMBORES + JAPÓN', style: 'top', beats: 7.6 }] : [];
+      const events: PhraseEvent[] = n === 0 ? [{ type: 'section', beat: 0, state: GameState.GuidedPractice }, { type: 'text', beat: 0, text: `TAMBORES + ${this.pack.answerLabel(jp)}`, style: 'top', beats: 7.6 }] : [];
       yield this.cg.challengePhrase('four', { targets: [jp], pool: g1, hint: true, glow: n === 0, scored: false, maxCorrect: 2, drums: 'pickup', bpm: 100, groove: 'intro', section: GameState.GuidedPractice, events });
     }
     const p = this.banner(this.practiceHits >= 1 ? '¡LO TIENES!' : '¡VAMOS!', 100, 'intro', 'unlock');
@@ -160,7 +156,7 @@ export class Setlist implements PhraseSource {
     this.cg.beginSection();
     const g1 = this.group(1);
     const S = GameState.EasyGroove;
-    yield this.title('EASY GROOVE', '4 banderas', S, 100, 'easy');
+    yield this.title('EASY GROOVE', `4 ${this.pack.noun}`, S, 100, 'easy');
     yield this.teach(g1, 100, 'easy', 'LA BANDA');
     for (let i = 0; i < 6; i++) {
       yield this.cg.challengePhrase('four', { pool: g1, hint: i < this.diff.hints, drums: i < 3 ? 'pickup' : 'gallop', bpm: 100, groove: 'easy', section: S, events: i === 3 ? this.announce('offbeat') : [] });
@@ -174,7 +170,7 @@ export class Setlist implements PhraseSource {
     const S = GameState.TeachNewFlags;
     const [de, pt, gb, br] = ['de', 'pt', 'gb', 'br'].map((id) => this.byId(id));
     const c = (t: LearningItem, drums: DrumPattern): Phrase => this.cg.challengePhrase('four', { targets: [t], pool: all, prefer: g2, drums, bpm: 102, groove: 'new', section: S });
-    yield this.title('NUEVO GROOVE', '4 banderas más', S, 102, 'new');
+    yield this.title('NUEVO GROOVE', `4 ${this.pack.noun} más`, S, 102, 'new');
     yield this.teach([de, pt], 102, 'new', '¡NUEVOS EN LA BANDA!');
     yield c(de, 'pickup');
     yield c(pt, 'sync');
@@ -223,8 +219,33 @@ export class Setlist implements PhraseSource {
     yield c(nl, [fr, pl], 'gallop');
   }
 
+  /** Capitales trampa: the famous city is right there on the lane, tempting you. */
+  private *traps(): Generator<Phrase, void, void> {
+    this.cg.beginSection();
+    const S = GameState.TeachNewFlags;
+    const pool = this.levelItems(2);
+    const [au, ca, tr, ch, ma, us, nl, ind] = ['au', 'ca', 'tr', 'ch', 'ma', 'us', 'nl', 'in'].map((x) => this.byId(x));
+    const bpm = 108;
+    const c = (t: LearningItem, drums: DrumPattern): Phrase => this.cg.challengePhrase('four', { targets: [t], pool, drums, bpm, groove: 'dembow', section: S });
+    yield this.title('GROOVE 2', 'capitales trampa', S, bpm, 'dembow');
+    yield this.teach([au, ca], bpm, 'dembow', '¡LA FAMOSA NO ES LA CAPITAL!');
+    yield c(au, 'sync');
+    yield c(ca, 'sync');
+    yield this.teach([tr, ch], bpm, 'dembow', 'NI ESTAMBUL NI ZÚRICH…');
+    yield c(tr, 'gallop');
+    yield c(ch, 'sync');
+    yield c(au, 'gallop');
+    yield this.teach([ma, us], bpm, 'dembow', 'NI CASABLANCA NI NUEVA YORK…');
+    yield c(ma, 'sync');
+    yield c(us, 'gallop');
+    yield this.teach([nl, ind], bpm, 'dembow', '¡OJO CON ESTAS DOS!');
+    yield c(nl, 'sync');
+    yield c(ind, 'gallop');
+  }
+
   private *mix2(): Generator<Phrase, void, void> {
-    yield this.title('MIX GEMELAS', 'no te fíes del color', GameState.MixGroove, 110, 'dembow');
+    const lv = this.pack.levels[2];
+    yield this.title(lv.mixTitle ?? 'MIX GROOVE', lv.mixSub ?? '', GameState.MixGroove, 110, 'dembow');
     if (this.diff.double) yield* this.doubleIntro(this.levelItems(2), 110, 'dembow', GameState.MixGroove);
     yield* this.adaptive({ section: GameState.MixGroove, pool: this.levelItems(2), groove: 'dembow', bpmFrom: 110, bpmTo: 116, budget: 96, allowQuick: true, allowFlash: true, allowDouble: true, drumBreak: true, ghostChance: this.diff.ghost / 2 });
   }
@@ -232,7 +253,7 @@ export class Setlist implements PhraseSource {
   private *final2(): Generator<Phrase, void, void> {
     const S = GameState.FinalGroove;
     const pool = this.levelItems(2);
-    const title = this.title('FINAL GROOVE', 'gemelas a ciegas', S, 118, 'final');
+    const title = this.title('FINAL GROOVE', this.pack.levels[2].finalSub ?? '¡a por todas!', S, 118, 'final');
     title.events.push({ type: 'riser', beat: 0, beats: 4 });
     yield title;
     const blind = this.diff.id !== 'facil';
@@ -340,7 +361,7 @@ export class Setlist implements PhraseSource {
   }
 
   private levelItems(l: LevelId): LearningItem[] {
-    return LEVELS[l].items.map((id) => this.byId(id));
+    return this.pack.levels[l].items.map((id) => this.byId(id));
   }
 
   private title(text: string, sub: string, state: GameState, bpm: number, groove: GrooveId): Phrase {

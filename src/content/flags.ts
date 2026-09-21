@@ -4,6 +4,36 @@ import type { ContentPack, LearningItem } from './types';
 let uid = 0;
 const S = 'preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"';
 
+
+/** Star polygon points (n tips). */
+function star(cx: number, cy: number, r: number, n = 5, inner = 0.42, rot = -Math.PI / 2): string {
+  const pts: string[] = [];
+  for (let i = 0; i < n * 2; i++) {
+    const rr = i % 2 ? r * inner : r;
+    const a = rot + (i * Math.PI) / n;
+    pts.push(`${(cx + Math.cos(a) * rr).toFixed(1)},${(cy + Math.sin(a) * rr).toFixed(1)}`);
+  }
+  return pts.join(' ');
+}
+
+/** Outline star drawn with one line (Morocco). */
+function pentagram(cx: number, cy: number, r: number): string {
+  const pts: string[] = [];
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5;
+    pts.push(`${(cx + Math.cos(a) * r).toFixed(1)},${(cy + Math.sin(a) * r).toFixed(1)}`);
+  }
+  return pts.join(' ');
+}
+
+/** Simplified maple leaf around (500, 250). */
+const LEAF = [
+  [0, -190], [30, -120], [70, -140], [55, -50], [120, -100], [110, -60], [170, -70], [140, -10], [165, 0], [80, 60], [95, 95], [15, 80], [12, 170],
+  [-12, 170], [-15, 80], [-95, 95], [-80, 60], [-165, 0], [-140, -10], [-170, -70], [-110, -60], [-120, -100], [-55, -50], [-70, -140], [-30, -120],
+]
+  .map(([x, y]) => `${500 + x},${250 + y}`)
+  .join(' ');
+
 const FLAG_SVGS: Record<string, (u: number) => string> = {
   es: () => `<svg viewBox="0 0 750 500" ${S}>
     <rect width="750" height="500" fill="#AA151B"/><rect y="125" width="750" height="250" fill="#F1BF00"/>
@@ -56,6 +86,47 @@ const FLAG_SVGS: Record<string, (u: number) => string> = {
   pl: () => `<svg viewBox="0 0 900 600" ${S}><rect width="900" height="300" fill="#fff"/><rect y="300" width="900" height="300" fill="#DC143C"/></svg>`,
   id: () => `<svg viewBox="0 0 900 600" ${S}><rect width="900" height="300" fill="#CE1126"/><rect y="300" width="900" height="300" fill="#fff"/></svg>`,
   nl: () => `<svg viewBox="0 0 900 600" ${S}><rect width="900" height="200" fill="#AE1C28"/><rect y="200" width="900" height="200" fill="#fff"/><rect y="400" width="900" height="200" fill="#21468B"/></svg>`,
+  au: (u) => `<svg viewBox="0 0 600 300" ${S}>
+    <rect width="600" height="300" fill="#012169"/>
+    <svg x="0" y="0" width="300" height="150" viewBox="0 0 60 30">
+      <clipPath id="aus${u}"><path d="M0,0 v30 h60 v-30 z"/></clipPath>
+      <clipPath id="aut${u}"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath>
+      <g clip-path="url(#aus${u})">
+        <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/>
+        <path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#aut${u})" stroke="#C8102E" stroke-width="4"/>
+        <path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/>
+        <path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/>
+      </g>
+    </svg>
+    <g fill="#fff"><polygon points="${star(150, 225, 42, 7)}"/><polygon points="${star(450, 245, 20, 7)}"/><polygon points="${star(380, 150, 20, 7)}"/><polygon points="${star(450, 65, 20, 7)}"/><polygon points="${star(520, 130, 20, 7)}"/><polygon points="${star(485, 180, 11, 5)}"/></g>
+  </svg>`,
+  ca: () => `<svg viewBox="0 0 1000 500" ${S}>
+    <rect width="1000" height="500" fill="#fff"/><rect width="250" height="500" fill="#D52B1E"/><rect x="750" width="250" height="500" fill="#D52B1E"/>
+    <polygon fill="#D52B1E" points="${LEAF}"/>
+  </svg>`,
+  tr: () => `<svg viewBox="0 0 900 600" ${S}>
+    <rect width="900" height="600" fill="#E30A17"/>
+    <circle cx="340" cy="300" r="150" fill="#fff"/><circle cx="378" cy="300" r="120" fill="#E30A17"/>
+    <polygon fill="#fff" points="${star(530, 300, 62, 5, 0.38, -Math.PI)}"/>
+  </svg>`,
+  ch: () => `<svg viewBox="0 0 900 600" ${S}>
+    <rect width="900" height="600" fill="#DA291C"/><rect x="270" y="250" width="360" height="100" fill="#fff"/><rect x="400" y="120" width="100" height="360" fill="#fff"/>
+  </svg>`,
+  ma: () => `<svg viewBox="0 0 900 600" ${S}>
+    <rect width="900" height="600" fill="#C1272D"/>
+    <polygon points="${pentagram(450, 310, 125)}" fill="none" stroke="#006233" stroke-width="20" stroke-linejoin="round"/>
+  </svg>`,
+  us: () => `<svg viewBox="0 0 760 400" ${S}>
+    ${Array.from({ length: 13 }, (_, i) => `<rect y="${(i * 400) / 13}" width="760" height="${400 / 13 + 0.5}" fill="${i % 2 ? '#fff' : '#B22234'}"/>`).join('')}
+    <rect width="304" height="215" fill="#3C3B6E"/>
+    <g fill="#fff">${Array.from({ length: 30 }, (_, i) => `<circle cx="${28 + (i % 6) * 50 + (Math.floor(i / 6) % 2) * 22}" cy="${24 + Math.floor(i / 6) * 42}" r="8"/>`).join('')}</g>
+  </svg>`,
+  in: () => `<svg viewBox="0 0 900 600" ${S}>
+    <rect width="900" height="200" fill="#FF9933"/><rect y="200" width="900" height="200" fill="#fff"/><rect y="400" width="900" height="200" fill="#138808"/>
+    <circle cx="450" cy="300" r="78" fill="none" stroke="#000080" stroke-width="12"/>
+    <g stroke="#000080" stroke-width="5">${Array.from({ length: 12 }, (_, i) => { const a = (i * Math.PI) / 12; return `<line x1="${450 + Math.cos(a) * 72}" y1="${300 + Math.sin(a) * 72}" x2="${450 - Math.cos(a) * 72}" y2="${300 - Math.sin(a) * 72}"/>`; }).join('')}</g>
+    <circle cx="450" cy="300" r="14" fill="#000080"/>
+  </svg>`,
 };
 
 export const FLAG_ITEMS: LearningItem[] = [
@@ -76,12 +147,22 @@ export const FLAG_ITEMS: LearningItem[] = [
   { id: 'nl', country: 'PAÍSES BAJOS', flagAsset: 'nl', difficulty: 3, group: 3 },
 ];
 
+/** Renders a local SVG flag (shared by every pack that shows flags). */
+export const renderFlag = (asset: string): string => FLAG_SVGS[asset](++uid);
+
 export const FLAGS_PACK: ContentPack = {
   id: 'flags',
   title: 'WORLD BEAT',
   subtitle: 'Banderas',
   items: FLAG_ITEMS,
-  renderPrompt: (item) => FLAG_SVGS[item.flagAsset](++uid),
+  levels: {
+    1: { name: 'GROOVE 1', items: ['es', 'jp', 'fr', 'it', 'de', 'pt', 'gb', 'br'] },
+    2: { name: 'GROOVE 2 · GEMELAS', items: ['it', 'mx', 'ie', 'de', 'be', 'fr', 'nl', 'pl', 'id'], intro: 'twins', mixTitle: 'MIX GEMELAS', mixSub: 'no te fíes del color', finalSub: 'gemelas a ciegas' },
+  },
+  noun: 'banderas',
+  answerNoun: 'país',
+  rule: 'Golpea los tambores… y el país de la bandera',
+  renderPrompt: (item) => renderFlag(item.flagAsset),
   answerLabel: (item) => item.country,
   byId(id) {
     const it = FLAG_ITEMS.find((i) => i.id === id);

@@ -76,7 +76,7 @@ export class Stage {
 
   constructor(
     host: HTMLElement,
-    private pack: ContentPack,
+    public pack: ContentPack,
     private fx: Particles,
     private reduced: boolean,
   ) {
@@ -263,6 +263,7 @@ export class Stage {
   coverFlag(): void {
     this.flagSlot.querySelectorAll<HTMLElement>('.flag-group:not(.leaving) .flag-card').forEach((card) => {
       if (card.querySelector('.cover')) return;
+      card.classList.add('covered');
       const c = document.createElement('div');
       c.className = 'cover';
       c.textContent = '?';
@@ -281,7 +282,8 @@ export class Stage {
   private flagCard(item: LearningItem): HTMLDivElement {
     const card = document.createElement('div');
     card.className = 'flag-card';
-    card.innerHTML = `<div class="flag-art">${this.pack.renderPrompt(item)}</div><div class="eyes"><i><b></b></i><i><b></b></i></div>`;
+    const caption = this.pack.promptCaption?.(item);
+    card.innerHTML = `<div class="flag-art">${this.pack.renderPrompt(item)}</div>${caption ? `<div class="prompt-caption">${caption}</div>` : ''}<div class="eyes"><i><b></b></i><i><b></b></i></div>`;
     return card;
   }
 

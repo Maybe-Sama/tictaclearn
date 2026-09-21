@@ -9,13 +9,13 @@ import type { DebugPanel } from '../ui/Debug';
 import type { Particles } from '../ui/Particles';
 import type { CalibrationScreen, Menu, PauseOverlay, ResultsScreen } from '../ui/Screens';
 import type { Stage } from '../ui/Stage';
-import { loadBest, loadDifficulty, loadOffset, saveBest, saveDifficulty, saveOffset } from '../util/storage';
+import { loadBest, loadDifficulty, loadOffset, loadSubject, saveBest, saveDifficulty, saveOffset, saveSubject } from '../util/storage';
 import { ChallengeGenerator } from './ChallengeGenerator';
 import { DIFFICULTIES, DIFFICULTY_ORDER, DifficultyDirector, type DifficultyId, type DifficultySettings } from './Difficulty';
 import { GameState, GameStateMachine, PLAYING_STATES } from './GameStateMachine';
 import { LearningTracker, type Outcome } from './LearningTracker';
 import { SessionStats } from './SessionStats';
-import { LEVELS, Setlist, type LevelId } from './Setlist';
+import { Setlist, type LevelId } from './Setlist';
 
 export interface GameUI {
   stage: Stage;
@@ -71,11 +71,19 @@ export class Game {
   private bot: Bot | null = null;
   private calib: Calib | null = null;
 
+  private pack: ContentPack;
+
   constructor(
-    private pack: ContentPack,
+    private packs: ContentPack[],
     private ui: GameUI,
     private opts: GameOptions,
   ) {
+    const savedSubject = loadSubject();
+    this.pack = packs.find((p) => p.id === savedSubject) ?? packs[0];
+    ui.menu.onSubject = (id) => this.setSubject(id);
+    ui.menu.setSubject(this.pack);
+    ui.stage.pack = this.pack;
+    ui.results.pack = this.pack;
     this.tracker = this.newTracker(1);
     const saved = loadDifficulty();
     if (saved && saved in DIFFICULTIES) this.diff = DIFFICULTIES[saved as DifficultyId];
@@ -102,7 +110,7 @@ export class Game {
 
   private newTracker(level: LevelId, carry?: LearningTracker): LearningTracker {
     return new LearningTracker(
-      LEVELS[level].items.map((id) => this.pack.byId(id)),
+      this.pack.levels[level].items.map((id) => this.pack.byId(id)),
       carry,
     );
   }
@@ -114,8 +122,23 @@ export class Game {
     this.ui.menu.show(this.fsm.state === GameState.Menu, loadBest(this.bestKey(1)));
   }
 
+  /** Switch subject (Banderas / Capitales). Only from the menu. */
+  setSubject(id: string): void {
+    const next = this.packs.find((p) => p.id === id);
+    if (!next || next === this.pack) return;
+    this.pack = next;
+    saveSubject(id);
+    this.ui.stage.pack = next;
+    this.ui.results.pack = next;
+    this.ui.menu.setSubject(next);
+    this.tracker = this.newTracker(1);
+    this.ui.menu.show(this.fsm.state === GameState.Menu, loadBest(this.bestKey(1)));
+  }
+
+  /** Records per subject + groove + difficulty (Banderas keeps its original keys). */
   private bestKey(level: LevelId = this.level): string {
-    return `${level}-${this.diff.id}`;
+    const base = `${level}-${this.diff.id}`;
+    return this.pack.id === 'flags' ? base : `${this.pack.id}-${base}`;
   }
 
   private ensureAudio(): AudioEngine {
@@ -194,10 +217,10 @@ export class Game {
     this.fsm.transition(GameState.Results);
     const byId = (id: string) => this.pack.byId(id);
     this.ui.results.show(true, {
-      level: `${LEVELS[this.level].name} · ${this.diff.label}`,
+      level: `${this.pack.subtitle.toUpperCase()} · ${this.pack.levels[this.level].name} · ${this.diff.label}`,
       suggestion: this.suggestion(),
       recognized: this.tracker.recognizedCount(),
-      total: LEVELS[this.level].items.length,
+      total: this.pack.levels[this.level].items.length,
       timingPct: this.stats.timingPct,
       maxCombo: this.stats.maxCombo,
       perfect: this.stats.perfect,
@@ -217,7 +240,7 @@ export class Game {
   /** Nudge players toward the difficulty that fits them. */
   private suggestion(): string | null {
     const i = DIFFICULTY_ORDER.indexOf(this.diff.id);
-    const total = LEVELS[this.level].items.length;
+    const total = this.pack.levels[this.level].items.length;
     const great = this.stats.timingPct >= 88 && this.tracker.recognizedCount() >= total - 1 && this.stats.miss <= 8;
     const rough = this.stats.timingPct < 55 || this.tracker.recognizedCount() <= total / 2;
     if (great && i < DIFFICULTY_ORDER.length - 1) return `¿Te atreves con ${DIFFICULTIES[DIFFICULTY_ORDER[i + 1]].label}? Cámbialo en el menú`;
@@ -305,7 +328,10 @@ export class Game {
       if (action === 'confirm' || action === 'hit') this.start(1, false);
       else if (action === 'level2') this.start(2, false);
       else if (action === 'calibrate') this.startCalibration();
-      else if (action === 'prev' || action === 'next') {
+      else if (action === 'subject') {
+        const i = this.packs.indexOf(this.pack);
+        this.setSubject(this.packs[(i + 1) % this.packs.length].id);
+      } else if (action === 'prev' || action === 'next') {
         const i = DIFFICULTY_ORDER.indexOf(this.diff.id) + (action === 'next' ? 1 : -1);
         this.setDifficulty(DIFFICULTY_ORDER[Math.max(0, Math.min(DIFFICULTY_ORDER.length - 1, i))]);
       }

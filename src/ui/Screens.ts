@@ -18,10 +18,15 @@ export class Menu {
   onPlay2: () => void = () => {};
   onCalibrate: () => void = () => {};
   onDifficulty: (id: DifficultyId) => void = () => {};
+  onSubject: (id: string) => void = () => {};
   private best: HTMLElement;
   private diffDesc: HTMLElement;
 
-  constructor(host: HTMLElement, pack: ContentPack) {
+  constructor(
+    host: HTMLElement,
+    pack: ContentPack,
+    packs: ContentPack[],
+  ) {
     const word = (w: string, offset: number): string =>
       [...w]
         .map((ch, i) =>
@@ -38,22 +43,31 @@ export class Menu {
       'menu screen',
       `<div class="menu-flags" aria-hidden="true">${flags}</div>
        <div class="logo" aria-label="${pack.title}"><div class="logo-row">${word('WORLD', 0)}</div><div class="logo-row">${word('BEAT', 5)}</div></div>
-       <div class="subtitle">${pack.subtitle}</div>
+       <div class="subject-row" role="radiogroup" aria-label="Asignatura">
+         ${packs.map((p) => `<button class="subject" type="button" role="radio" data-id="${p.id}">${p.subtitle}</button>`).join('')}
+       </div>
        <div class="diff-row" role="radiogroup" aria-label="Dificultad">
          ${DIFFICULTY_ORDER.map((id) => `<button class="diff d-${id}" type="button" role="radio" data-id="${id}">${DIFFICULTIES[id].label}</button>`).join('')}
        </div>
        <p class="diff-desc"></p>
        <button class="btn-play" type="button">JUGAR</button>
        <div class="menu-row">
-         <button class="btn-level2" type="button">GROOVE 2 · GEMELAS <small>2</small></button>
+         <button class="btn-level2" type="button"><span class="l2-name"></span> <small>2</small></button>
          <button class="btn-calibrate" type="button">AJUSTAR RITMO <small>C</small></button>
        </div>
-       <p class="menu-hint">Golpea los tambores… y el país de la bandera. ${TOUCH ? 'Toca la pantalla' : 'Todo con <kbd>ESPACIO</kbd>'}, al ritmo.</p>
+       <p class="menu-hint"><span class="rule"></span>. ${TOUCH ? 'Toca la pantalla' : 'Todo con <kbd>ESPACIO</kbd>'}, al ritmo.</p>
        <p class="menu-best"></p>`,
     );
     host.appendChild(this.root);
     this.best = this.root.querySelector('.menu-best')!;
     this.diffDesc = this.root.querySelector('.diff-desc')!;
+    this.root.querySelectorAll<HTMLButtonElement>('.subject').forEach((b) =>
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        b.blur();
+        this.onSubject(b.dataset.id!);
+      }),
+    );
     this.root.querySelectorAll<HTMLButtonElement>('.diff').forEach((b) =>
       b.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -80,6 +94,16 @@ export class Menu {
   show(v: boolean, best?: { score: number; combo: number }): void {
     this.root.classList.toggle('hidden', !v);
     if (v) this.best.textContent = best && best.score > 0 ? `Récord en esta dificultad: ${best.score.toLocaleString('es-ES')} · mejor combo ${best.combo}` : '';
+  }
+
+  setSubject(pack: ContentPack): void {
+    this.root.querySelectorAll<HTMLButtonElement>('.subject').forEach((b) => {
+      const on = b.dataset.id === pack.id;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', String(on));
+    });
+    this.root.querySelector('.l2-name')!.textContent = pack.levels[2].name;
+    this.root.querySelector('.rule')!.textContent = pack.rule;
   }
 
   setDifficulty(id: DifficultyId): void {
@@ -118,7 +142,7 @@ export class ResultsScreen {
 
   constructor(
     host: HTMLElement,
-    private pack: ContentPack,
+    public pack: ContentPack,
   ) {
     this.root = el('results screen hidden');
     host.appendChild(this.root);
@@ -127,14 +151,18 @@ export class ResultsScreen {
   show(v: boolean, d?: ResultsData): void {
     this.root.classList.toggle('hidden', !v);
     if (!v || !d) return;
-    const mini = (it: LearningItem, big = false): string => `<div class="rs-flag${big ? ' big' : ''}"><div class="rs-flag-art">${this.pack.renderPrompt(it)}</div><span>${this.pack.answerLabel(it)}</span></div>`;
+    const cap = (it: LearningItem): string => {
+      const c = this.pack.promptCaption?.(it);
+      return c ? `<em>${c}</em>` : '';
+    };
+    const mini = (it: LearningItem, big = false): string => `<div class="rs-flag${big ? ' big' : ''}"><div class="rs-flag-art">${this.pack.renderPrompt(it)}</div>${cap(it)}<span>${this.pack.answerLabel(it)}</span></div>`;
     const bubble = (label: string, value: string, color: string, i: number): string => `<div class="rs-bubble" style="--bc:${color};--i:${i}"><b data-count="${value}">${value}</b><span>${label}</span></div>`;
     this.root.innerHTML = `
       <h1 class="rs-title"><span>GROOVE</span><span>COMPLETE</span></h1>
       <p class="rs-level">${d.level}</p>${d.suggestion ? `<p class="rs-suggest">${d.suggestion}</p>` : ''}
       <div class="rs-body">
         <div class="rs-left">
-          <div class="rs-big"><div class="rs-big-num"><b>${d.recognized}</b><small>/${d.total}</small></div><div class="rs-big-label">banderas<br>reconocidas</div></div>
+          <div class="rs-big"><div class="rs-big-num"><b>${d.recognized}</b><small>/${d.total}</small></div><div class="rs-big-label">${this.pack.noun}<br>reconocidas</div></div>
           <div class="rs-bubbles">
             ${bubble('Timing', `${d.timingPct}%`, '#4FB3FF', 0)}
             ${bubble('Mejor combo', String(d.maxCombo), '#FF8C42', 1)}

@@ -1254,3 +1254,54 @@ body.portrait .btn-level2,
 body.portrait .btn-calibrate { font-size: 36px; padding: 14px 40px 18px; }
 body.portrait .menu-hint { font-size: 32px; }
 body.portrait .btn-pause { width: 80px; height: 80px; }
+
+/* ============================================================ v5: subjects (Banderas / Capitales) */
+.subject-row {
+  display: flex;
+  margin-top: 14px;
+  border: 6px solid var(--ink);
+  border-radius: 999px;
+  background: var(--cream);
+  box-shadow: 0 8px 0 var(--ink);
+  overflow: hidden;
+  rotate: -3deg;
+}
+.subject {
+  padding: 6px 30px 10px;
+  border: none;
+  background: transparent;
+  font-size: 34px;
+  letter-spacing: 3px;
+  opacity: 0.55;
+}
+.subject + .subject { border-left: 5px solid var(--ink); }
+/* Selected: filled + full opacity + a dot marker, not colour alone. */
+.subject.on { background: var(--teal); color: var(--cream); text-shadow: var(--outline); opacity: 1; }
+.subject.on::before { content: '● '; font-size: 0.6em; vertical-align: middle; }
+body.portrait .subject { font-size: 42px; padding: 8px 36px 12px; }
+
+/* The country name stuck under the flag (Capitales prompt). */
+.prompt-caption {
+  position: absolute;
+  left: 50%;
+  bottom: -30px;
+  transform: translateX(-50%) rotate(-2deg);
+  z-index: 3;
+  padding: 4px 22px 8px;
+  border: 6px solid var(--ink);
+  border-radius: 14px;
+  background: var(--cream);
+  box-shadow: 0 6px 0 var(--ink);
+  font-size: 34px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.flag-group.n2 .prompt-caption { font-size: 26px; padding: 3px 14px 6px; }
+.flag-card.covered .prompt-caption { opacity: 0; }
+.flag-card .cover { z-index: 4; }
+/* Leave room for the caption before the answer label. */
+body.portrait .label-anchor { top: calc(var(--flag-y) + 222px); }
+
+.rs-flag em { font-style: normal; font-size: 13px; opacity: 0.75; }
+.rs-flag.big em { font-size: 18px; color: var(--cream); text-shadow: var(--outline); opacity: 1; }
+body.portrait .rs-level { margin-top: 16px; font-size: 20px; }

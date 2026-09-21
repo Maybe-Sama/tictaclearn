@@ -80,6 +80,8 @@ export class ChallengeGenerator {
   private lastTargets: string[] = [];
   private lastIdx = -1;
   private seen = new Set<string>();
+  /** Decoy answers (e.g. SÍDNEY) as throwaway items, so they can ride the lane. */
+  private decoys = new Map<string, LearningItem>();
 
   constructor(
     private tracker: LearningTracker,
@@ -194,6 +196,16 @@ export class ChallengeGenerator {
     return [i, i + gap];
   }
 
+  private decoy(label: string): LearningItem {
+    const id = `decoy:${label}`;
+    let it = this.decoys.get(id);
+    if (!it) {
+      it = { id, country: label, answer: label, flagAsset: '', difficulty: 0, group: 0 };
+      this.decoys.set(id, it);
+    }
+    return it;
+  }
+
   /** No duplicates; past confusions come back as distractors on purpose. */
   private pickDistractors(targets: LearningItem[], pool: LearningItem[], count: number, prefer?: LearningItem[]): LearningItem[] {
     const excl = new Set(targets.map((t) => t.id));
@@ -205,8 +217,12 @@ export class ChallengeGenerator {
       }
     };
     for (const t of targets) {
-      const conf = this.tracker.topConfusions(t.id).map((id) => this.allItems.find((i) => i.id === id));
+      const conf = this.tracker.topConfusions(t.id).map((id) => this.decoys.get(id) ?? this.allItems.find((i) => i.id === id));
       if (conf.length && Math.random() < 0.7) add(conf[0]);
+      // The famous-but-wrong city is the whole point of a trap: it shows up most of the time.
+      shuffle(t.decoys ?? []).forEach((label, k) => {
+        if (Math.random() < (k === 0 ? 0.85 : 0.45)) add(this.decoy(label));
+      });
     }
     if (prefer) for (const it of shuffle(prefer).slice(0, Math.ceil(count / 2) + 1)) add(it);
     for (const it of shuffle(pool)) add(it);

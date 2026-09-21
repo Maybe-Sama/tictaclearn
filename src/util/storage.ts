@@ -2,6 +2,7 @@
 const KEY_BEST = 'worldbeat.best';
 const KEY_OFFSET = 'worldbeat.inputOffsetMs';
 const KEY_DIFF = 'worldbeat.difficulty';
+const KEY_SUBJECT = 'worldbeat.subject';
 
 export interface Best {
   score: number;
@@ -55,6 +56,22 @@ export function loadDifficulty(): string | null {
 export function saveDifficulty(id: string): void {
   try {
     localStorage.setItem(KEY_DIFF, id);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadSubject(): string | null {
+  try {
+    return localStorage.getItem(KEY_SUBJECT);
+  } catch {
+    return null;
+  }
+}
+
+export function saveSubject(id: string): void {
+  try {
+    localStorage.setItem(KEY_SUBJECT, id);
   } catch {
     /* ignore */
   }

@@ -1,4 +1,4 @@
-export type Action = 'hit' | 'confirm' | 'back' | 'restart' | 'skip' | 'offsetUp' | 'offsetDown' | 'level2' | 'calibrate' | 'prev' | 'next';
+export type Action = 'hit' | 'confirm' | 'back' | 'restart' | 'skip' | 'offsetUp' | 'offsetDown' | 'level2' | 'calibrate' | 'prev' | 'next' | 'subject';
 
 type Handler = (action: Action, timeStamp: number) => void;
 
@@ -30,6 +30,8 @@ export class Input {
         KeyC: 'calibrate',
         ArrowLeft: 'prev',
         ArrowRight: 'next',
+        ArrowUp: 'subject',
+        ArrowDown: 'subject',
       };
       const a = map[e.code];
       if (a) {
