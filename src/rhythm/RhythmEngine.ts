@@ -1,6 +1,6 @@
 import type { AudioEngine } from '../audio/AudioEngine';
 import { scheduleMusic, type MusicMix } from '../audio/Music';
-import type { Challenge, ChallengeSpec, Phrase, PhraseEvent, ScheduledPhrase, TimedVisual } from './types';
+import type { Challenge, ChallengeOption, ChallengeSpec, Phrase, PhraseEvent, ScheduledPhrase, TimedVisual } from './types';
 
 export interface PhraseSource {
   /** Called just before `startTime` so content can adapt to the latest results. */
@@ -29,6 +29,15 @@ export class RhythmEngine {
   songStart = 0;
   songEnd = Infinity;
   sourceDone = false;
+  /** Diagnostics: notes that reached the scheduler after their time. */
+  lateNotes = 0;
+  maxLateMs = 0;
+  /**
+   * Asked ~120 ms before each drum: should its sound be pre-scheduled on the
+   * exact beat? (Yes while the player is in the groove.) Input-triggered sounds
+   * always arrive one output-latency late; pre-scheduled ones are sample-accurate.
+   */
+  prePlay: (o: ChallengeOption) => boolean = () => false;
   private audioQ: { time: number; fn: (t: number) => void }[] = [];
   private visualQ: TimedVisual[] = [];
   private nextStart = 0;
@@ -78,6 +87,10 @@ export class RhythmEngine {
     while (n < this.audioQ.length && this.audioQ[n].time < horizon) {
       const e = this.audioQ[n++];
       // If the tab stalled we drop late notes instead of playing them off-beat.
+      if (e.time < now) {
+        this.lateNotes++;
+        this.maxLateMs = Math.max(this.maxLateMs, (now - e.time) * 1000);
+      }
       if (e.time >= now - 0.03) e.fn(Math.max(e.time, now));
     }
     if (n) this.audioQ.splice(0, n);
@@ -185,7 +198,13 @@ export class RhythmEngine {
         c.drumCount++;
         // Quiet guide so the drum line stays audible even when you miss it.
         this.pushAudio(time, (tt) => this.audio.guide(tt, offbeat));
-        if (spec.demo) this.pushAudio(time, (tt) => this.audio.drumHit(tt, offbeat, !!o.bell, 1));
+        const opt = c.options[c.options.length - 1];
+        this.pushAudio(time, (tt) => {
+          if (opt.state === 'pending' && (spec.demo || this.prePlay(opt))) {
+            opt.prePlayed = true;
+            this.audio.drumHit(tt, offbeat, !!o.bell, 1);
+          }
+        });
         return;
       }
       if (o.correct) {

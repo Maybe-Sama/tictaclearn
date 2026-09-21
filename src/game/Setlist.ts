@@ -11,8 +11,8 @@ interface AdaptiveOpts {
   section: GameState;
   pool: LearningItem[];
   groove: GrooveId;
-  bpmFrom: number;
-  bpmTo: number;
+  /** One tempo per section: the pulse never shifts under the player's feet. */
+  bpm: number;
   budget: number;
   allowQuick?: boolean;
   allowFlash?: boolean;
@@ -180,19 +180,19 @@ export class Setlist implements PhraseSource {
   }
 
   private *mix(): Generator<Phrase, void, void> {
-    yield this.title('MIX GROOVE', 'las 8 mezcladas', GameState.MixGroove, 104, 'mix');
-    yield* this.adaptive({ section: GameState.MixGroove, pool: this.levelItems(1), groove: 'mix', bpmFrom: 104, bpmTo: 112, budget: 88, allowQuick: true, allowFlash: true, drumBreak: true, ghostChance: this.diff.ghost / 2 });
+    yield this.title('MIX GROOVE', 'las 8 mezcladas', GameState.MixGroove, 106, 'mix');
+    yield* this.adaptive({ section: GameState.MixGroove, pool: this.levelItems(1), groove: 'mix', bpm: 106, budget: 88, allowQuick: true, allowFlash: true, drumBreak: true, ghostChance: this.diff.ghost / 2 });
   }
 
   private *final(): Generator<Phrase, void, void> {
     const S = GameState.FinalGroove;
     const pool = this.levelItems(1);
-    const title = this.title('FINAL GROOVE', '¡a por todas!', S, 114, 'final');
+    const title = this.title('FINAL GROOVE', '¡a por todas!', S, 116, 'final');
     title.events.push({ type: 'riser', beat: 0, beats: 4 });
     yield title;
-    if (this.diff.double) yield* this.doubleIntro(pool, 114, 'final', S);
-    yield* this.adaptive({ section: S, pool, groove: 'final', bpmFrom: 114, bpmTo: 118, budget: 64, allowQuick: true, allowFlash: true, allowDouble: true, ghostChance: this.diff.ghost });
-    yield this.finale(118);
+    if (this.diff.double) yield* this.doubleIntro(pool, 116, 'final', S);
+    yield* this.adaptive({ section: S, pool, groove: 'final', bpm: 116, budget: 64, allowQuick: true, allowFlash: true, allowDouble: true, ghostChance: this.diff.ghost });
+    yield this.finale(116);
   }
 
   // ================================================================== GROOVE 2
@@ -245,28 +245,28 @@ export class Setlist implements PhraseSource {
 
   private *mix2(): Generator<Phrase, void, void> {
     const lv = this.pack.levels[2];
-    yield this.title(lv.mixTitle ?? 'MIX GROOVE', lv.mixSub ?? '', GameState.MixGroove, 110, 'dembow');
-    if (this.diff.double) yield* this.doubleIntro(this.levelItems(2), 110, 'dembow', GameState.MixGroove);
-    yield* this.adaptive({ section: GameState.MixGroove, pool: this.levelItems(2), groove: 'dembow', bpmFrom: 110, bpmTo: 116, budget: 96, allowQuick: true, allowFlash: true, allowDouble: true, drumBreak: true, ghostChance: this.diff.ghost / 2 });
+    yield this.title(lv.mixTitle ?? 'MIX GROOVE', lv.mixSub ?? '', GameState.MixGroove, 112, 'dembow');
+    if (this.diff.double) yield* this.doubleIntro(this.levelItems(2), 112, 'dembow', GameState.MixGroove);
+    yield* this.adaptive({ section: GameState.MixGroove, pool: this.levelItems(2), groove: 'dembow', bpm: 112, budget: 96, allowQuick: true, allowFlash: true, allowDouble: true, drumBreak: true, ghostChance: this.diff.ghost / 2 });
   }
 
   private *final2(): Generator<Phrase, void, void> {
     const S = GameState.FinalGroove;
     const pool = this.levelItems(2);
-    const title = this.title('FINAL GROOVE', this.pack.levels[2].finalSub ?? '¡a por todas!', S, 118, 'final');
+    const title = this.title('FINAL GROOVE', this.pack.levels[2].finalSub ?? '¡a por todas!', S, 120, 'final');
     title.events.push({ type: 'riser', beat: 0, beats: 4 });
     yield title;
     const blind = this.diff.id !== 'facil';
     if (blind) yield this.cg.drumPhrase(8, [0, 1, 1.5, 2, 3, 4, 5, 5.5, 6, 7], {
-      bpm: 118,
+      bpm: 120,
       groove: 'final',
       section: S,
       ghost: true,
       events: [{ type: 'text', beat: 0, text: '¡A CIEGAS!', sub: 'siente el pulso', style: 'top', beats: 7.6 }],
     });
     this.introduced.add('ghost');
-    yield* this.adaptive({ section: S, pool, groove: 'final', bpmFrom: 118, bpmTo: 124, budget: 72, allowQuick: true, allowFlash: true, allowDouble: true, ghostChance: blind ? Math.max(0.4, this.diff.ghost) : 0 });
-    yield this.finale(124);
+    yield* this.adaptive({ section: S, pool, groove: 'final', bpm: 120, budget: 72, allowQuick: true, allowFlash: true, allowDouble: true, ghostChance: blind ? Math.max(0.4, this.diff.ghost) : 0 });
+    yield this.finale(120);
   }
 
   // ================================================================== adaptive core
@@ -282,7 +282,7 @@ export class Setlist implements PhraseSource {
     let n = 0;
     while (used < o.budget) {
       const tier = this.dd.tier;
-      const bpm = Math.round(o.bpmFrom + (o.bpmTo - o.bpmFrom) * (used / o.budget)) + (tier === 2 ? 2 : 0);
+      const bpm = o.bpm;
       const base = { pool: o.pool, bpm, groove: o.groove, section: o.section };
 
       if (!breakDone && used >= o.budget * 0.45) {

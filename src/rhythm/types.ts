@@ -93,6 +93,8 @@ export interface ChallengeOption {
   beatDur: number;
   state: OptionState;
   judgement?: Judgement;
+  /** Its drum sound was scheduled ahead, exactly on the beat (player in the groove). */
+  prePlayed?: boolean;
 }
 
 export interface Challenge {

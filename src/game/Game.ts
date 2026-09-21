@@ -166,6 +166,7 @@ export class Game {
     const cg = new ChallengeGenerator(this.tracker, this.pack.items);
     this.setlist = new Setlist(this.pack, cg, this.dd, this.diff, { level, skipTutorial });
     this.engine = new RhythmEngine(a, this.setlist, this.mix);
+    this.engine.prePlay = (o) => this.inGroove(o);
     this.judge = new Judge(this.engine, this.diff.windows);
     this.ui.stage.setFeverAt(this.diff.feverAt);
 
@@ -180,6 +181,12 @@ export class Game {
     this.updateMix();
     this.playing = true;
     this.engine.start(a.ctx.currentTime + 0.35);
+  }
+
+  /** In the groove = the last thing you played was a hit. Then your drums are pre-scheduled on the beat. */
+  private inGroove(o: ChallengeOption): boolean {
+    if (!this.playing || this.paused) return false;
+    return o.challenge.scored ? this.stats.combo > 0 : this.practiceStep > 0;
   }
 
   toMenu(): void {
@@ -388,9 +395,18 @@ export class Game {
     if (!this.audio || !this.judge || !this.playing || this.paused) return;
     this.ui.stage.stamp();
     const j = this.judge.judgeInput(inputTime);
-    // Drums answer with a drum; countries get the rubber stamp.
-    if (!(j.drum && j.grade !== 'miss')) this.audio.stampThunk(this.audio.ctx.currentTime, j.drum ? 0.4 : 0.8);
+    // Drums answer with a drum; countries get the rubber stamp, snapped onto the beat when you were on time.
+    if (!(j.drum && j.grade !== 'miss')) this.audio.stampThunk(this.soundTime(j), j.drum ? 0.4 : 0.8);
     this.apply(j);
+  }
+
+  /**
+   * When to sound a hit: on the exact beat if it is still ahead in the audio
+   * clock (you pressed on time or early), otherwise right now.
+   */
+  private soundTime(j: Judgement): number {
+    const now = this.audio!.ctx.currentTime;
+    return j.option && j.grade !== 'miss' ? Math.max(now, j.option.time) : now;
   }
 
   private apply(j: Judgement): void {
@@ -423,11 +439,13 @@ export class Game {
           st.streak(ev.streak);
         }
       } else step = this.practiceStep++;
+      const at = this.soundTime(j);
       if (j.drum) {
-        a.drumHit(now, !!j.option?.offbeat, !!j.option?.bell, j.grade === 'perfect' ? 1 : 0.7);
+        // Already pre-scheduled on the beat if you were in the groove.
+        if (!j.option?.prePlayed) a.drumHit(at, !!j.option?.offbeat, !!j.option?.bell, j.grade === 'perfect' ? 1 : 0.7);
         if (scored) this.dd.recordDrum(true);
-      } else if (j.grade === 'perfect') a.perfect(now, step);
-      else a.good(now, step);
+      } else if (j.grade === 'perfect') a.perfect(at, step);
+      else a.good(at, step);
       if (!j.drum && c?.section === GameState.GuidedPractice) this.setlist?.notifyPracticeHit();
       st.feedback(j);
       if (scored) {
@@ -520,7 +538,7 @@ export class Game {
         latency: audio.latency,
         offset: audio.inputOffsetMs,
         combo: this.stats.combo,
-        extra: `${this.diff.id}  layer ${this.mix.level}  skill ${this.dd.skill.toFixed(2)} (tier ${this.dd.tier})`,
+        extra: `${this.diff.id}  late ${engine.lateNotes}  layer ${this.mix.level}  skill ${this.dd.skill.toFixed(2)} (tier ${this.dd.tier})`,
       });
     }
   };
