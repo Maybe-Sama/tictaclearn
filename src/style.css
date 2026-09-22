@@ -1488,3 +1488,141 @@ body.portrait .pick-name { font-size: 17px; }
 .menu > *:not(.menu-flags) { position: relative; z-index: 1; }
 body.portrait .mf { width: 116px; }
 body.portrait .btn-tour { font-size: 76px; padding: 12px 70px 20px; }
+
+/* ============================================================ v7: landing in three steps */
+.menu { padding-top: 26px; }
+.l { font-size: 104px; }
+.l.globe { width: 92px; height: 92px; vertical-align: -6px; }
+.menu-step {
+  margin-top: 16px;
+  font-size: 21px;
+  letter-spacing: 2px;
+  color: var(--ink);
+  opacity: 0.72;
+}
+.subject-cards { display: flex; gap: 20px; margin-top: 8px; }
+.subject-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 360px;
+  padding: 12px 20px 14px 14px;
+  border: 6px solid var(--ink);
+  border-radius: 26px;
+  background: var(--cream);
+  box-shadow: 0 8px 0 var(--ink);
+  text-align: left;
+  opacity: 1;
+  transition: transform 0.12s, background-color 0.12s;
+}
+.subject-card .sc-art { flex: none; width: 92px; aspect-ratio: 4 / 3; border: 4px solid var(--ink); border-radius: 10px; overflow: hidden; }
+.subject-card .sc-text { display: flex; flex-direction: column; gap: 2px; }
+.subject-card b { font-size: 32px; letter-spacing: 1px; }
+.subject-card small { font-size: 16px; opacity: 0.75; line-height: 1.1; }
+.subject-card .sc-check { position: absolute; top: -14px; right: -12px; display: none; width: 38px; height: 38px; border-radius: 50%; border: 5px solid var(--ink); background: var(--sun); color: var(--ink); font-style: normal; font-size: 20px; line-height: 28px; text-align: center; }
+/* Selected: filled + lifted + check badge (not colour alone). */
+.subject-card.on { background: var(--teal); color: var(--cream); transform: translateY(-4px); }
+.subject-card.on b { text-shadow: var(--outline); }
+.subject-card.on small { opacity: 0.95; }
+.subject-card.on .sc-check { display: block; }
+.subject-card:not(.on):hover { transform: translateY(-2px); }
+
+.btn-tour { display: flex; flex-direction: column; align-items: center; margin-top: 22px; padding: 10px 110px 16px; font-size: inherit; }
+.btn-tour .play-main { font-size: 70px; line-height: 1; }
+.btn-tour .play-sub { margin-top: 6px; font-size: 20px; letter-spacing: 0.5px; text-shadow: none; opacity: 0.95; }
+.menu .menu-hint { margin-top: 12px; font-size: 20px; opacity: 0.85; }
+
+.menu-modes { display: flex; gap: 14px; margin-top: 8px; }
+.mode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 22px 10px;
+  border: 5px solid var(--ink);
+  border-radius: 20px;
+  background: var(--cream);
+  box-shadow: 0 6px 0 var(--ink);
+}
+.mode b { font-size: 21px; }
+.mode small { font-size: 14px; opacity: 0.7; }
+.mode:active, .subject-card:active, .btn-settings:active { transform: translateY(5px); box-shadow: 0 2px 0 var(--ink); }
+.btn-settings {
+  margin-top: 16px;
+  padding: 6px 20px 8px;
+  border: 4px solid var(--ink);
+  border-radius: 999px;
+  background: rgba(255, 247, 230, 0.75);
+  box-shadow: 0 4px 0 var(--ink);
+  font-size: 18px;
+}
+.settings-sum { opacity: 0.7; }
+
+.menu > .settings-sheet {
+  position: absolute;
+  inset: -500px;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgba(36, 22, 67, 0.5);
+  backdrop-filter: blur(3px);
+}
+.menu > .settings-sheet.hidden { display: none !important; }
+.sheet-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 780px;
+  padding: 28px 40px 32px;
+  border: 8px solid var(--ink);
+  border-radius: 44px;
+  background: var(--sun);
+  box-shadow: 0 14px 0 var(--ink);
+}
+.sheet-card h3 { font-size: 58px; color: var(--cream); text-shadow: var(--outline-xl); }
+.sheet-label { margin-top: 14px; font-size: 22px; letter-spacing: 1px; }
+.sheet-card .diff-row { margin-top: 10px; }
+.sheet-card .diff { opacity: 0.8; }
+.sheet-card .diff.on { opacity: 1; }
+.sheet-row { display: flex; gap: 16px; margin-top: 20px; }
+.sheet-row button { padding: 8px 24px 11px; border: 5px solid var(--ink); border-radius: 999px; background: var(--cream); box-shadow: 0 6px 0 var(--ink); font-size: 24px; }
+.sheet-note { margin-top: 12px; font-size: 17px; opacity: 0.8; text-align: center; }
+.sheet-card .menu-best { margin-top: 6px; font-size: 16px; }
+.btn-sheet-close { margin-top: 18px; padding: 8px 60px 12px; border: 6px solid var(--ink); border-radius: 999px; background: var(--pink); color: #fff; font-size: 34px; text-shadow: var(--outline); box-shadow: 0 8px 0 var(--ink); }
+
+/* ---- portrait: bigger targets, no floating flags, cards stacked vertically */
+body.portrait .menu-flags { display: none; }
+body.portrait .menu { justify-content: center; padding-top: 0; }
+body.portrait .l { font-size: 150px; }
+body.portrait .l.globe { width: 132px; height: 132px; }
+body.portrait .menu-step { margin-top: 30px; font-size: 28px; }
+body.portrait .subject-cards { gap: 22px; margin-top: 12px; }
+body.portrait .subject-card { width: 395px; flex-direction: column; align-items: center; text-align: center; padding: 18px 16px 20px; gap: 12px; }
+body.portrait .subject-card .sc-art { width: 150px; }
+body.portrait .subject-card b { font-size: 40px; }
+body.portrait .subject-card small { font-size: 22px; }
+body.portrait .btn-tour { width: 812px; margin-top: 34px; padding: 18px 20px 24px; }
+body.portrait .btn-tour .play-main { font-size: 96px; }
+body.portrait .btn-tour .play-sub { font-size: 26px; }
+body.portrait .menu .menu-hint { font-size: 26px; max-width: 800px; margin-top: 16px; }
+body.portrait .menu-modes { width: 812px; gap: 14px; }
+body.portrait .mode { flex: 1; padding: 14px 8px 16px; }
+body.portrait .mode b { font-size: 25px; text-align: center; }
+body.portrait .mode small { font-size: 19px; text-align: center; }
+body.portrait .btn-settings { margin-top: 28px; font-size: 26px; padding: 10px 30px 12px; }
+body.portrait .sheet-card { width: 840px; }
+body.portrait .sheet-card .diff-row { flex-wrap: wrap; justify-content: center; }
+body.portrait .sheet-card .diff { font-size: 30px; }
+body.portrait .sheet-note { font-size: 22px; }
+/* Landing clean-up: neutralise legacy button styles. */
+.subject-card, .subject-card + .subject-card { border-left-width: 6px; letter-spacing: normal; font-size: inherit; }
+.subject-card.on::before { content: none; }
+.subject-card .sc-q { font-size: 16px; opacity: 0.8; line-height: 1.15; }
+.subject-card.on .sc-q { opacity: 1; }
+body.portrait .subject-card .sc-q { font-size: 23px; }
+.mode.btn-level2 { background: var(--cream); color: var(--ink); text-shadow: none; font-size: inherit; padding: 8px 22px 10px; box-shadow: 0 6px 0 var(--ink); }
+.mode-sub { font-size: 14px; opacity: 0.7; }
+body.portrait .mode-sub { font-size: 19px; text-align: center; }
+body.portrait .mode.btn-level2 { padding: 14px 8px 16px; }
+.sheet-row .btn-voice, .sheet-row .btn-calibrate { font-size: 24px; padding: 8px 24px 11px; background: var(--cream); color: var(--ink); text-shadow: none; box-shadow: 0 6px 0 var(--ink); }
+body.portrait .sheet-row .btn-voice, body.portrait .sheet-row .btn-calibrate { font-size: 32px; padding: 12px 30px 15px; }

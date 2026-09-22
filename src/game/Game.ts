@@ -153,6 +153,7 @@ export class Game {
     this.ui.stage.pack = next;
     this.ui.results.pack = next;
     this.ui.menu.setSubject(next);
+    this.ui.menu.setContinue(this.continueText());
     this.tracker = this.newTracker(1);
     this.ui.menu.show(this.fsm.state === GameState.Menu, loadBest(this.bestKey(1)));
   }
@@ -193,6 +194,22 @@ export class Game {
     this.stopSong();
     this.ui.free.open(this.pack, this.progress);
     this.fsm.transition(GameState.Free);
+  }
+
+  /** Where JUGAR will take you: the first unlocked concert you have not passed. */
+  private continueText(): string {
+    const P = this.pack.id;
+    const stages = this.tour();
+    const anyPlayed = stages.some((s) => s.concerts.some((c) => this.progress.concert(P, c.id)));
+    for (const st of stages) {
+      for (const c of st.concerts) {
+        if (!this.progress.concert(P, c.id)?.passed && concertUnlocked(stages, this.progress, P, c)) {
+          const name = c.final ? 'GRAN FINAL' : (c.theme ?? c.title);
+          return anyPlayed ? `Seguir el Beat Tour · ${st.name} · ${name}` : `Beat Tour · empieza en ${st.name}`;
+        }
+      }
+    }
+    return 'Beat Tour · ¡gira completada!';
   }
 
   private toggleVoice(): void {
@@ -415,6 +432,7 @@ export class Game {
     if (!PLAYING_STATES.has(to)) document.body.classList.remove('fever-mode');
     const playing = this.fsm.isPlaying;
     this.ui.menu.show(to === GameState.Menu, loadBest(this.bestKey(1)));
+    if (to === GameState.Menu) this.ui.menu.setContinue(this.continueText());
     this.ui.stage.show(playing);
     this.ui.calib.show(to === GameState.Calibration);
     this.ui.tour.show(to === GameState.Tour);
@@ -488,6 +506,14 @@ export class Game {
   onAction(action: Action, ts: number): void {
     const s = this.fsm.state;
     if (s === GameState.Menu) {
+      if (this.ui.menu.settingsOpen) {
+        if (action === 'back' || action === 'confirm') this.ui.menu.closeSettings();
+        else if (action === 'prev' || action === 'next') {
+          const i = DIFFICULTY_ORDER.indexOf(this.diff.id) + (action === 'next' ? 1 : -1);
+          this.setDifficulty(DIFFICULTY_ORDER[Math.max(0, Math.min(DIFFICULTY_ORDER.length - 1, i))]);
+        }
+        return;
+      }
       if (action === 'confirm') this.openTour();
       else if (action === 'level1') this.start(1, false);
       else if (action === 'level2') this.start(2, false);
