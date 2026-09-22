@@ -158,7 +158,7 @@ export class ResultsScreen {
     const mini = (it: LearningItem, big = false): string => `<div class="rs-flag${big ? ' big' : ''}"><div class="rs-flag-art">${this.pack.renderPrompt(it)}</div>${cap(it)}<span>${this.pack.answerLabel(it)}</span></div>`;
     const bubble = (label: string, value: string, color: string, i: number): string => `<div class="rs-bubble" style="--bc:${color};--i:${i}"><b data-count="${value}">${value}</b><span>${label}</span></div>`;
     this.root.innerHTML = `
-      <h1 class="rs-title"><span>GROOVE</span><span>COMPLETE</span></h1>
+      <h1 class="rs-title"><span>BEAT</span><span>COMPLETE</span></h1>
       <p class="rs-level">${d.level}</p>${d.suggestion ? `<p class="rs-suggest">${d.suggestion}</p>` : ''}
       <div class="rs-body">
         <div class="rs-left">

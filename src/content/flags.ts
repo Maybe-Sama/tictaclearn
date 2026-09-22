@@ -156,8 +156,8 @@ export const FLAGS_PACK: ContentPack = {
   subtitle: 'Banderas',
   items: FLAG_ITEMS,
   levels: {
-    1: { name: 'GROOVE 1', items: ['es', 'jp', 'fr', 'it', 'de', 'pt', 'gb', 'br'] },
-    2: { name: 'GROOVE 2 · GEMELAS', items: ['it', 'mx', 'ie', 'de', 'be', 'fr', 'nl', 'pl', 'id'], intro: 'twins', mixTitle: 'MIX GEMELAS', mixSub: 'no te fíes del color', finalSub: 'gemelas a ciegas' },
+    1: { name: 'BEAT 1', items: ['es', 'jp', 'fr', 'it', 'de', 'pt', 'gb', 'br'] },
+    2: { name: 'BEAT 2 · GEMELAS', items: ['it', 'mx', 'ie', 'de', 'be', 'fr', 'nl', 'pl', 'id'], intro: 'twins', mixTitle: 'MIX GEMELAS', mixSub: 'no te fíes del color', finalSub: 'gemelas a ciegas' },
   },
   noun: 'banderas',
   answerNoun: 'país',

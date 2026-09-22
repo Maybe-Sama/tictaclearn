@@ -51,7 +51,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultySettings> = {
   normal: {
     id: 'normal',
     label: 'NORMAL',
-    desc: 'el groove de siempre',
+    desc: 'el beat de siempre',
     bpmScale: 1,
     windows: { perfect: 0.08, good: 0.16 },
     minTier: 0,

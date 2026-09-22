@@ -22,7 +22,7 @@ export interface LearningItem {
 export type LevelId = 1 | 2;
 
 export interface LevelDef {
-  /** e.g. "GROOVE 2 · TRAMPAS" */
+  /** e.g. "BEAT 2 · TRAMPAS" */
   name: string;
   items: string[];
   /** Which hand-written teaching section opens Groove 2. */

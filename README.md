@@ -3,8 +3,8 @@
 Prototipo jugable de un juego de ritmo educativo: **golpea los tambores… y el país de la bandera**, todo con una tecla y al ritmo.
 
 - **Asignatura** (↑/↓ o tocando en el menú): **Banderas** (bandera → país) o **Capitales** (bandera + país → capital).
-- **Groove 1** (JUGAR): tutorial → Easy → Nuevo → Mix → Final, 8 países.
-- **Groove 2** (tecla `2`): en Banderas, *Gemelas* (Italia/México/Irlanda, Alemania/Bélgica, Polonia/Indonesia, Francia/Países Bajos); en Capitales, *Trampas*: la capital no es la ciudad famosa, y la famosa pasa por el carril como señuelo (Canberra/Sídney, Ottawa/Toronto, Ankara/Estambul, Berna/Zúrich, Rabat/Casablanca, Washington/Nueva York, Ámsterdam/La Haya, Nueva Delhi/Bombay).
+- **Beat 1** (JUGAR): tutorial → Easy → Nuevo → Mix → Final, 8 países.
+- **Beat 2** (tecla `2`): en Banderas, *Gemelas* (Italia/México/Irlanda, Alemania/Bélgica, Polonia/Indonesia, Francia/Países Bajos); en Capitales, *Trampas*: la capital no es la ciudad famosa, y la famosa pasa por el carril como señuelo (Canberra/Sídney, Ottawa/Toronto, Ankara/Estambul, Berna/Zúrich, Rabat/Casablanca, Washington/Nueva York, Ámsterdam/La Haya, Nueva Delhi/Bombay).
 - **Dificultad** (←/→ en el menú): FÁCIL · NORMAL · DIFÍCIL · EXPERTO. Cambia BPM (−12 % … +12 %), ventanas de timing (±200 ms … ±105 ms para GOOD), límites de la dificultad adaptativa, contratiempos/flash/doble/a ciegas, umbral de FEVER, tutorial y multiplicador de puntos. Récord separado por groove y dificultad. Todo en `src/game/Difficulty.ts`.
 - **Ajustar ritmo** (tecla `C`): 12 clics, pulsa con cada uno y guarda tu latencia.
 
@@ -26,7 +26,7 @@ npm run build    # typecheck + build de producción
 
 - **ESPACIO** = golpear (también clic/toque en la pantalla)
 - **ENTER** = jugar / continuar / otra vez
-- **←/→** = dificultad · **2** = Groove 2 · **C** = ajustar ritmo (en el menú)
+- **←/→** = dificultad · **2** = Beat 2 · **C** = ajustar ritmo (en el menú)
 - **ESC** = pausa (ENTER sigue, R reinicia)
 
 ## Debug

@@ -251,7 +251,7 @@ export class Game {
     const great = this.stats.timingPct >= 88 && this.tracker.recognizedCount() >= total - 1 && this.stats.miss <= 8;
     const rough = this.stats.timingPct < 55 || this.tracker.recognizedCount() <= total / 2;
     if (great && i < DIFFICULTY_ORDER.length - 1) return `¿Te atreves con ${DIFFICULTIES[DIFFICULTY_ORDER[i + 1]].label}? Cámbialo en el menú`;
-    if (rough && i > 0) return `Prueba ${DIFFICULTIES[DIFFICULTY_ORDER[i - 1]].label} para pillarle el groove`;
+    if (rough && i > 0) return `Prueba ${DIFFICULTIES[DIFFICULTY_ORDER[i - 1]].label} para pillarle el beat`;
     return null;
   }
 

@@ -12,10 +12,10 @@ const HOP_HEIGHT = 34;
 const SECTION_NAMES: Partial<Record<GameState, string>> = {
   [GameState.RhythmTutorial]: 'SIENTE EL RITMO',
   [GameState.GuidedPractice]: 'TU TURNO',
-  [GameState.EasyGroove]: 'EASY GROOVE',
-  [GameState.TeachNewFlags]: 'NUEVO GROOVE',
-  [GameState.MixGroove]: 'MIX GROOVE',
-  [GameState.FinalGroove]: 'FINAL GROOVE',
+  [GameState.EasyGroove]: 'EASY BEAT',
+  [GameState.TeachNewFlags]: 'NUEVO BEAT',
+  [GameState.MixGroove]: 'MIX BEAT',
+  [GameState.FinalGroove]: 'FINAL BEAT',
 };
 
 const MILESTONES: Record<number, string> = { 5: 'NICE!', 10: 'KEEP IT!', 30: 'ON FIRE!', 50: '¡IMPARABLE!', 75: 'NAILED IT!', 100: '¡LEYENDA!' };

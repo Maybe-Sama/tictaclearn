@@ -32,8 +32,8 @@ export const CAPITALS_PACK: ContentPack = {
   subtitle: 'Capitales',
   items: CAPITAL_ITEMS,
   levels: {
-    1: { name: 'GROOVE 1', items: ['es', 'jp', 'fr', 'it', 'de', 'pt', 'gb', 'br'] },
-    2: { name: 'GROOVE 2 · TRAMPAS', items: ['au', 'ca', 'tr', 'ch', 'ma', 'us', 'nl', 'in'], intro: 'traps', mixTitle: 'MIX TRAMPAS', mixSub: 'la famosa no siempre manda', finalSub: 'capitales a ciegas' },
+    1: { name: 'BEAT 1', items: ['es', 'jp', 'fr', 'it', 'de', 'pt', 'gb', 'br'] },
+    2: { name: 'BEAT 2 · TRAMPAS', items: ['au', 'ca', 'tr', 'ch', 'ma', 'us', 'nl', 'in'], intro: 'traps', mixTitle: 'MIX TRAMPAS', mixSub: 'la famosa no siempre manda', finalSub: 'capitales a ciegas' },
   },
   noun: 'capitales',
   answerNoun: 'capital',
