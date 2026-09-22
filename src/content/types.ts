@@ -15,8 +15,11 @@ export interface LearningItem {
   flagAsset: string;
   /** 1 (easy) .. 3 (hard). */
   difficulty: number;
-  /** Teaching wave: group 1 first, group 2 later, group 3 = Groove 2. */
+  /** Teaching wave of quick-play Beat 1: group 1 first, group 2 later, 3 = the rest. */
   group: number;
+  continent?: string;
+  /** Items people confuse with this one (preferred distractors). */
+  lookalikes?: string[];
 }
 
 export type LevelId = 1 | 2;
@@ -25,7 +28,7 @@ export interface LevelDef {
   /** e.g. "BEAT 2 · TRAMPAS" */
   name: string;
   items: string[];
-  /** Which hand-written teaching section opens Groove 2. */
+  /** Which hand-written teaching section opens Beat 2. */
   intro?: 'twins' | 'traps';
   mixTitle?: string;
   mixSub?: string;
@@ -39,6 +42,8 @@ export interface ContentPack {
   subtitle: string;
   items: LearningItem[];
   levels: Record<LevelId, LevelDef>;
+  /** Themed look-alike groups (Gira Mundial concerts). */
+  clusters: { name: string; ids: string[] }[];
   /** Plural noun for results: "banderas", "capitales". */
   noun: string;
   /** What you hit: "país", "capital". */
@@ -51,5 +56,7 @@ export interface ContentPack {
   promptCaption?(item: LearningItem): string;
   /** Text that lands on the beat. */
   answerLabel(item: LearningItem): string;
+  /** What the voice says when the item is taught. */
+  spoken(item: LearningItem): string;
   byId(id: string): LearningItem;
 }

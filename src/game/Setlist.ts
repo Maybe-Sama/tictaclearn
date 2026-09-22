@@ -2,7 +2,8 @@ import type { ContentPack, LearningItem, LevelId } from '../content/types';
 import type { PhraseSource } from '../rhythm/RhythmEngine';
 import type { GrooveId, Phrase, PhraseEvent } from '../rhythm/types';
 import { OFFBEAT_PATTERNS, TEMPLATES, type ChallengeGenerator, type DrumPattern, type TemplateId } from './ChallengeGenerator';
-import type { DifficultyDirector, DifficultySettings } from './Difficulty';
+import type { DifficultyDirector, DifficultySettings, Tier } from './Difficulty';
+import type { ConcertParams } from './Tour';
 import { GameState } from './GameStateMachine';
 
 export type { LevelId };
@@ -19,6 +20,24 @@ interface AdaptiveOpts {
   allowDouble?: boolean;
   ghostChance?: number;
   drumBreak?: boolean;
+  /** Cap for the adaptive tier (Beat Tour ramps it with tour position). */
+  maxTier?: Tier;
+  /** Events for the first adaptive phrase (e.g. the section change). */
+  firstEvents?: PhraseEvent[];
+}
+
+/** A Beat Tour concert or a Beat Libre session. */
+export interface SessionPlan {
+  title: string;
+  sub: string;
+  /** Text of the HUD pill during the session. */
+  pill: string;
+  newItems: LearningItem[];
+  pool: LearningItem[];
+  params: ConcertParams;
+  final: boolean;
+  /** 0..1 how far into the tour (drives look-alike distractors). */
+  depth: number;
 }
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -42,9 +61,12 @@ export class Setlist implements PhraseSource {
     private cg: ChallengeGenerator,
     private dd: DifficultyDirector,
     private diff: DifficultySettings,
-    opts: { level: LevelId; skipTutorial: boolean },
+    opts: { level: LevelId; skipTutorial: boolean; plan?: SessionPlan },
   ) {
-    if (opts.level === 2) {
+    if (opts.plan) {
+      const plan = opts.plan;
+      this.sections = [() => this.planned(plan)];
+    } else if (opts.level === 2) {
       const intro = pack.levels[2].intro === 'traps' ? () => this.traps() : () => this.twins();
       this.sections = [intro, () => this.mix2(), () => this.final2()];
     } else {
@@ -269,6 +291,43 @@ export class Setlist implements PhraseSource {
     yield this.finale(120);
   }
 
+  // ================================================================== BEAT TOUR / BEAT LIBRE
+
+  /**
+   * Teach two, play each right away (interleaved practice), then an adaptive
+   * mix over new + review items, then the ending.
+   */
+  private *planned(pl: SessionPlan): Generator<Phrase, void, void> {
+    this.cg.beginSection();
+    this.cg.lookalikeRate = 0.25 + 0.5 * pl.depth;
+    const P = pl.params;
+    const teachState = GameState.TeachNewFlags;
+    const playState = GameState.MixGroove;
+    yield this.title(pl.title, pl.sub, pl.newItems.length ? teachState : playState, P.bpm, P.groove, pl.pill);
+    const drums: DrumPattern = P.maxTier === 0 ? 'pickup' : 'sync';
+    for (let i = 0; i < pl.newItems.length; i += 2) {
+      const pair = pl.newItems.slice(i, i + 2);
+      yield this.teach(pair, P.bpm, P.groove, i === 0 ? '¡NUEVOS EN LA GIRA!' : '¡Y AHORA ESTOS!');
+      for (const t of pair) yield this.cg.challengePhrase('four', { targets: [t], pool: pl.pool, drums, bpm: P.bpm, groove: P.groove, section: teachState });
+    }
+    if (P.double && this.diff.double) yield* this.doubleIntro(pl.pool, P.bpm, P.groove, playState);
+    yield* this.adaptive({
+      section: playState,
+      pool: pl.pool,
+      groove: P.groove,
+      bpm: P.bpm,
+      budget: P.budget,
+      allowQuick: P.quick,
+      allowFlash: P.flash,
+      allowDouble: P.double,
+      ghostChance: Math.max(P.ghost, this.diff.ghost),
+      drumBreak: pl.final,
+      maxTier: P.maxTier,
+      firstEvents: [{ type: 'section', beat: 0, state: playState, label: pl.pill }],
+    });
+    yield this.finale(P.bpm);
+  }
+
   // ================================================================== adaptive core
 
   /**
@@ -281,7 +340,8 @@ export class Setlist implements PhraseSource {
     let breakDone = !o.drumBreak;
     let n = 0;
     while (used < o.budget) {
-      const tier = this.dd.tier;
+      const tier = Math.min(this.dd.tier, o.maxTier ?? 2) as Tier;
+      const firstEvents = n === 0 && used === 0 ? (o.firstEvents ?? []) : [];
       const bpm = o.bpm;
       const base = { pool: o.pool, bpm, groove: o.groove, section: o.section };
 
@@ -290,7 +350,7 @@ export class Setlist implements PhraseSource {
         used += 8;
         yield this.cg.drumPhrase(8, pick([[0, 1, 1.5, 2, 3, 4, 4.5, 5, 6, 6.5, 7], [0, 0.5, 1, 2, 2.5, 3, 4, 5, 5.5, 6, 7], [0, 1, 2, 2.5, 3, 3.5, 4, 5, 6, 7]]), {
           ...base,
-          events: [{ type: 'text', beat: 0, text: '¡SOLO DE TAMBOR!', style: 'top', beats: 7.5 }],
+          events: [...firstEvents, { type: 'text', beat: 0, text: '¡SOLO DE TAMBOR!', style: 'top', beats: 7.5 }],
         });
         continue;
       }
@@ -298,7 +358,7 @@ export class Setlist implements PhraseSource {
       if (o.allowQuick && tier >= 1 && n >= 2 && Math.random() < (tier === 2 ? 0.35 : 0.2)) {
         const count = tier === 2 ? 4 : 2;
         for (let k = 0; k < count; k++) {
-          yield this.cg.challengePhrase('quick', { ...base, drums: 'basic', ghost: this.ghost(o), events: k === 0 ? this.announce('quick') : [] });
+          yield this.cg.challengePhrase('quick', { ...base, drums: 'basic', ghost: this.ghost(o), events: k === 0 ? [...firstEvents, ...this.announce('quick')] : [] });
         }
         used += 4 * count;
         n++;
@@ -309,7 +369,7 @@ export class Setlist implements PhraseSource {
       const tid = pick(choices);
       const drums: DrumPattern = tier === 0 ? pick(['basic', 'pickup']) : tier === 1 ? pick(['pickup', 'sync', 'gallop']) : pick(['sync', 'gallop', 'offbeats']);
       const flash = !!o.allowFlash && this.diff.flash && tier === 2 && tid !== 'double' && Math.random() < 0.35;
-      const events: PhraseEvent[] = [];
+      const events: PhraseEvent[] = [...firstEvents];
       if (OFFBEAT_PATTERNS.has(drums)) events.push(...this.announce('offbeat'));
       if (flash) events.push(...this.announce('flash'));
       if (tid === 'double') events.push(...this.announce('double'));
@@ -364,7 +424,7 @@ export class Setlist implements PhraseSource {
     return this.pack.levels[l].items.map((id) => this.byId(id));
   }
 
-  private title(text: string, sub: string, state: GameState, bpm: number, groove: GrooveId): Phrase {
+  private title(text: string, sub: string, state: GameState, bpm: number, groove: GrooveId, pill?: string): Phrase {
     return {
       label: `title:${text}`,
       bpm,
@@ -373,7 +433,7 @@ export class Setlist implements PhraseSource {
       fill: true,
       crashAt: [0],
       events: [
-        { type: 'section', beat: 0, state },
+        { type: 'section', beat: 0, state, label: pill },
         { type: 'clear', beat: 0 },
         { type: 'text', beat: 0, text, sub, style: 'title', beats: 3.6 },
         { type: 'jingle', beat: 0, kind: 'section' },
@@ -409,7 +469,8 @@ export class Setlist implements PhraseSource {
       events.push({ type: 'teach', beat: i * per, item });
       events.push({ type: 'jingle', beat: i * per, kind: 'teach', n: i });
     });
-    return { label: `teach:${items.map((i) => i.id).join(',')}`, bpm, beats: items.length * per, groove, events, challenges: [] };
+    // Keep phrases a whole number of bars (a single item still takes a full bar).
+    return { label: `teach:${items.map((i) => i.id).join(',')}`, bpm, beats: Math.ceil((items.length * per) / 4) * 4, groove, events, challenges: [] };
   }
 
   private finale(bpm: number): Phrase {

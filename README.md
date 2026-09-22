@@ -10,6 +10,19 @@ Prototipo jugable de un juego de ritmo educativo: **golpea los tambores… y el 
 
 Mecánicas: tambores (siempre se golpean), tambores «y» a contratiempo, ráfagas (una bandera por compás), bandera flash (se tapa), tambores a ciegas, doble golpe. La banda suma capas con tu combo (8 / 16 / 30 = FEVER, puntos ×2) y se apaga un momento cuando fallas. Una dificultad dinámica invisible elige las plantillas del Mix y el Final según cómo juegas.
 
+## Beat Tour (modo historia)
+
+Una gira mundial por asignatura: **7 etapas** (Europa, América del Sur, América del Norte y Caribe, África, Asia, Oceanía y Gira Mundial) y **60 conciertos**. Cada concierto enseña 4–5 países en orden de familiaridad y repasa los anteriores; cada etapa acaba en una **Gran Final**. La Gira Mundial son conciertos temáticos de banderas o capitales que se confunden.
+
+- **Se supera por conocimiento** (≥ 70 % reconocido). ⭐⭐ con ≥ 90 %; ⭐⭐⭐ además con timing ≥ 80 %. La dificultad de ritmo (Fácil…Experto) va aparte.
+- La dificultad crece con la posición en la gira: tempo 98→116 BPM, plantillas rítmicas, ráfagas, flash, doble y banderas/capitales parecidas como distractores.
+- El siguiente continente se abre al superar la mitad del anterior; la Gira Mundial, tras 3 Grandes Finales.
+- **Progreso y dominio de cada país se guardan** (localStorage, cajas de repaso espaciado): lo que fallas vuelve antes, también días después.
+
+**Beat Libre**: elige continente, países sueltos o "los que fallo". La lista muestra tu dominio (nuevo / aprendiendo / dominado).
+
+Contenido: 195 países (193 ONU + Vaticano y Palestina) en `src/content/countries.ts`, con capital, continente, dificultad, señuelos y grupos de parecidas. Israel y Palestina no entran en Capitales (capital en disputa). Banderas: [flag-icons](https://github.com/lipis/flag-icons) (MIT), empaquetadas en local. La voz del navegador pronuncia cada país al presentarlo (tecla `V` para activar o desactivar).
+
 ## Móvil y tablet
 
 Dos composiciones del escenario: horizontal 16:9 y vertical 9:16 (móvil de pie), elegida automáticamente al girar o redimensionar (`src/ui/layout.ts`). En pantallas táctiles se toca en cualquier parte para golpear, hay botón de pausa y los textos dicen TOCA en vez de ESPACIO.
@@ -26,7 +39,8 @@ npm run build    # typecheck + build de producción
 
 - **ESPACIO** = golpear (también clic/toque en la pantalla)
 - **ENTER** = jugar / continuar / otra vez
-- **←/→** = dificultad · **2** = Beat 2 · **C** = ajustar ritmo (en el menú)
+- Menú: **ENTER** = Beat Tour · **1** / **2** = Beat 1 / Beat 2 · **L** = Beat Libre · **C** = ajustar ritmo · **V** = voz · **←/→** = dificultad · **↑/↓** = asignatura
+- Mapa del Tour: **←/→** concierto · **↑/↓** etapa · **ENTER** jugar · **ESC** volver
 - **ESC** = pausa (ENTER sigue, R reinicia)
 
 ## Debug

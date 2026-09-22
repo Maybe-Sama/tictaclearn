@@ -8,7 +8,7 @@ export type TextStyle = 'title' | 'big' | 'top';
 
 /** Everything in a phrase is placed on the musical grid (beats), never in ms. */
 export type PhraseEvent =
-  | { type: 'section'; beat: number; state: GameState }
+  | { type: 'section'; beat: number; state: GameState; label?: string }
   | { type: 'text'; beat: number; text: string; sub?: string; style: TextStyle; beats?: number }
   | { type: 'count'; beat: number; n: number }
   | { type: 'teach'; beat: number; item: LearningItem }

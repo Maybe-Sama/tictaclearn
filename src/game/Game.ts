@@ -1,13 +1,18 @@
 import { AudioEngine } from '../audio/AudioEngine';
 import type { MusicMix } from '../audio/Music';
-import type { ContentPack } from '../content/types';
+import type { ContentPack, LearningItem } from '../content/types';
 import type { Action } from '../input/Input';
 import { Judge } from '../rhythm/Judge';
 import { RhythmEngine } from '../rhythm/RhythmEngine';
 import type { Challenge, ChallengeOption, Judgement, TimedVisual } from '../rhythm/types';
 import type { DebugPanel } from '../ui/Debug';
 import type { Particles } from '../ui/Particles';
-import type { CalibrationScreen, Menu, PauseOverlay, ResultsScreen } from '../ui/Screens';
+import type { CalibrationScreen, Menu, PauseOverlay, ResultsData, ResultsScreen } from '../ui/Screens';
+import type { FreeScreen, TourScreen } from '../ui/Hubs';
+import { preloadFlags } from '../content/flags';
+import { setVoice, silence, voiceEnabled } from '../util/voice';
+import { Progress } from './Progress';
+import { buildTour, concertUnlocked, nextConcert, starsFor, type ConcertDef, type StageDef } from './Tour';
 import type { Stage } from '../ui/Stage';
 import { loadBest, loadDifficulty, loadOffset, loadSubject, saveBest, saveDifficulty, saveOffset, saveSubject } from '../util/storage';
 import { ChallengeGenerator } from './ChallengeGenerator';
@@ -15,7 +20,7 @@ import { DIFFICULTIES, DIFFICULTY_ORDER, DifficultyDirector, type DifficultyId, 
 import { GameState, GameStateMachine, PLAYING_STATES } from './GameStateMachine';
 import { LearningTracker, type Outcome } from './LearningTracker';
 import { SessionStats } from './SessionStats';
-import { Setlist, type LevelId } from './Setlist';
+import { Setlist, type LevelId, type SessionPlan } from './Setlist';
 
 export interface GameUI {
   stage: Stage;
@@ -23,6 +28,8 @@ export interface GameUI {
   results: ResultsScreen;
   pause: PauseOverlay;
   calib: CalibrationScreen;
+  tour: TourScreen;
+  free: FreeScreen;
   fx: Particles;
   debug: DebugPanel | null;
 }
@@ -39,6 +46,9 @@ const SECTION_BASE_LAYER: Partial<Record<GameState, number>> = {
   [GameState.GuidedPractice]: 1,
   [GameState.FinalGroove]: 1,
 };
+
+/** What the current / last session was, so OTRA VEZ and the hub buttons know where to go. */
+type Mode = { kind: 'beat'; level: LevelId } | { kind: 'tour'; concert: ConcertDef } | { kind: 'free'; ids: string[] };
 
 interface Calib {
   start: number;
@@ -70,6 +80,9 @@ export class Game {
   private practiceStep = 0;
   private bot: Bot | null = null;
   private calib: Calib | null = null;
+  private mode: Mode = { kind: 'beat', level: 1 };
+  readonly progress = new Progress();
+  private tours = new Map<string, StageDef[]>();
 
   private pack: ContentPack;
 
@@ -92,12 +105,21 @@ export class Game {
     this.fsm.onChange((to) => this.onStateChange(to));
     ui.menu.onPlay = () => this.start(1, false);
     ui.menu.onPlay2 = () => this.start(2, false);
+    ui.menu.onTour = () => this.openTour();
+    ui.menu.onFree = () => this.openFree();
+    ui.menu.onVoice = () => this.toggleVoice();
+    ui.menu.setVoice(voiceEnabled());
     ui.menu.onCalibrate = () => this.startCalibration();
-    ui.results.onAgain = () => this.start(this.level, true);
-    ui.results.onRestart = () => this.toMenu();
+    ui.tour.onBack = () => this.toMenu();
+    ui.tour.onPlay = (c) => this.startConcert(c);
+    ui.free.onBack = () => this.toMenu();
+    ui.free.onPlay = (ids) => this.startFree(ids);
+    ui.results.onAgain = () => this.again();
+    ui.results.onRestart = () => this.toHub();
+    ui.results.onNext = () => this.nextFromResults();
     ui.pause.onResume = () => this.resume();
     ui.stage.onPause = () => this.pause();
-    ui.pause.onRestart = () => this.toMenu();
+    ui.pause.onRestart = () => this.toHub();
     ui.calib.onDone = () => this.toMenu();
     ui.calib.onRetry = () => this.startCalibration();
     document.addEventListener('visibilitychange', () => {
@@ -150,21 +172,134 @@ export class Game {
     return this.audio;
   }
 
+  // ------------------------------------------------------------------ hubs
+
+  tour(): StageDef[] {
+    let t = this.tours.get(this.pack.id);
+    if (!t) {
+      t = buildTour(this.pack);
+      this.tours.set(this.pack.id, t);
+    }
+    return t;
+  }
+
+  openTour(stageIdx?: number, focus?: number): void {
+    this.stopSong();
+    this.ui.tour.open(this.pack, this.tour(), this.progress, stageIdx, focus);
+    this.fsm.transition(GameState.Tour);
+  }
+
+  openFree(): void {
+    this.stopSong();
+    this.ui.free.open(this.pack, this.progress);
+    this.fsm.transition(GameState.Free);
+  }
+
+  private toggleVoice(): void {
+    setVoice(!voiceEnabled());
+    this.ui.menu.setVoice(voiceEnabled());
+  }
+
+  /** Back to wherever this session came from. */
+  private toHub(): void {
+    if (this.mode.kind === 'tour') this.openTour(this.mode.concert.stage.index, this.mode.concert.index);
+    else if (this.mode.kind === 'free') this.openFree();
+    else this.toMenu();
+  }
+
+  private again(): void {
+    const m = this.mode;
+    if (m.kind === 'tour') this.startConcert(m.concert);
+    else if (m.kind === 'free') this.startFree(m.ids);
+    else this.start(m.level, true);
+  }
+
+  private nextFromResults(): void {
+    if (this.mode.kind !== 'tour') return this.again();
+    const n = nextConcert(this.mode.concert);
+    if (n && concertUnlocked(this.tour(), this.progress, this.pack.id, n)) this.startConcert(n);
+    else this.toHub();
+  }
+
   // ------------------------------------------------------------------ flow
 
+  /** Beat 1 / Beat 2 quick play. */
   start(level: LevelId, replay: boolean): void {
+    const sameLevel = replay && level === this.level && this.mode.kind === 'beat';
+    this.level = level;
+    this.mode = { kind: 'beat', level };
+    const skipTutorial = replay || this.diff.skipTutorial;
+    const first = level === 2 ? GameState.TeachNewFlags : skipTutorial ? GameState.EasyGroove : GameState.RhythmTutorial;
+    this.launch(this.newTracker(level, sameLevel ? this.tracker : undefined), { level, skipTutorial }, first);
+  }
+
+  /** A Beat Tour concert: new countries + a review of earlier ones from the same stage. */
+  startConcert(c: ConcertDef): void {
+    this.mode = { kind: 'tour', concert: c };
+    const P = this.pack.id;
+    const byUrgency = (ids: string[]) => [...ids].sort((a, b) => this.progress.urgency(P, a) - this.progress.urgency(P, b));
+    let newItems: LearningItem[] = [];
+    let pool: LearningItem[];
+    let weak: string[];
+    if (c.poolIds.length) {
+      pool = c.poolIds.map((id) => this.pack.byId(id));
+      weak = byUrgency(c.poolIds.filter((id) => this.progress.mastery(P, id))).slice(0, 6);
+    } else {
+      newItems = c.newIds.map((id) => this.pack.byId(id));
+      const earlier = c.stage.concerts.slice(0, c.index).flatMap((x) => x.newIds);
+      const review = byUrgency(earlier).slice(0, 4);
+      pool = [...newItems, ...review.map((id) => this.pack.byId(id))];
+      weak = review;
+    }
+    const tracker = new LearningTracker(pool);
+    tracker.boost(weak);
+    const depth = c.stage.index / 6;
+    const plan: SessionPlan = { title: c.stage.name, sub: c.theme ?? c.title, pill: `${c.stage.name} · ${c.final ? 'FINAL' : c.index + 1}`, newItems, pool, params: c.params, final: c.final, depth };
+    this.launch(tracker, { level: 1, skipTutorial: true, plan }, newItems.length ? GameState.TeachNewFlags : GameState.MixGroove);
+  }
+
+  /** Beat Libre: your own set. Unknown countries get taught first (up to 6). */
+  startFree(ids: string[]): void {
+    this.mode = { kind: 'free', ids };
+    const P = this.pack.id;
+    const pool = ids.map((id) => this.pack.byId(id));
+    const newItems = pool.filter((i) => this.progress.level(P, i.id) === 'nuevo').slice(0, 6);
+    const tracker = new LearningTracker(pool);
+    tracker.boost(ids.filter((id) => this.progress.level(P, id) === 'aprendiendo'));
+    const n = pool.length;
+    const plan: SessionPlan = {
+      title: 'BEAT LIBRE',
+      sub: `${n} ${this.pack.noun}`,
+      pill: 'BEAT LIBRE',
+      newItems,
+      pool,
+      params: { bpm: 104, groove: 'mix', maxTier: 2, quick: true, flash: true, double: true, ghost: 0, budget: Math.max(56, Math.min(112, 40 + 4 * n)) },
+      final: n >= 12,
+      depth: 0.6,
+    };
+    this.launch(tracker, { level: 1, skipTutorial: true, plan }, newItems.length ? GameState.TeachNewFlags : GameState.MixGroove);
+  }
+
+  private stopSong(): void {
+    this.engine?.stop();
+    this.audio?.resetBuses();
+    silence();
+    this.playing = false;
+    this.paused = false;
+    this.calib = null;
+    this.ui.pause.show(false);
+  }
+
+  private launch(tracker: LearningTracker, opts: { level: LevelId; skipTutorial: boolean; plan?: SessionPlan }, first: GameState): void {
     const a = this.ensureAudio();
     this.engine?.stop();
     this.calib = null;
-
-    const sameLevel = replay && level === this.level;
-    this.level = level;
-    this.tracker = this.newTracker(level, sameLevel ? this.tracker : undefined);
+    this.tracker = tracker;
+    preloadFlags(tracker.all().map((s) => s.id));
     this.stats = new SessionStats(this.diff.feverAt, this.diff.scoreMult);
     this.dd = new DifficultyDirector(this.diff);
-    const skipTutorial = replay || this.diff.skipTutorial;
     const cg = new ChallengeGenerator(this.tracker, this.pack.items);
-    this.setlist = new Setlist(this.pack, cg, this.dd, this.diff, { level, skipTutorial });
+    this.setlist = new Setlist(this.pack, cg, this.dd, this.diff, opts);
     this.engine = new RhythmEngine(a, this.setlist, this.mix);
     this.engine.prePlay = (o) => this.inGroove(o);
     this.judge = new Judge(this.engine, this.diff.windows);
@@ -176,7 +311,6 @@ export class Game {
     this.ui.pause.show(false);
     this.ui.calib.show(false);
     this.ui.stage.reset();
-    const first = level === 2 ? GameState.TeachNewFlags : skipTutorial ? GameState.EasyGroove : GameState.RhythmTutorial;
     this.fsm.transition(first);
     this.updateMix();
     this.playing = true;
@@ -190,13 +324,8 @@ export class Game {
   }
 
   toMenu(): void {
-    this.engine?.stop();
-    this.audio?.resetBuses();
+    this.stopSong();
     if (this.audio && this.audio.ctx.state === 'suspended') void this.audio.ctx.resume();
-    this.playing = false;
-    this.paused = false;
-    this.calib = null;
-    this.ui.pause.show(false);
     this.fsm.transition(GameState.Menu);
   }
 
@@ -218,16 +347,41 @@ export class Game {
     this.playing = false;
     this.resultsAt = null;
     this.engine?.stop();
-    const best = loadBest(this.bestKey());
+    silence();
+    const P = this.pack.id;
+    const all = this.tracker.all();
+    // Long-term memory: every session teaches the Leitner boxes something.
+    this.progress.recordOutcomes(P, new Map(all.map((s) => [s.id, s.history])));
+
+    const key = this.mode.kind === 'tour' ? `tour-${this.mode.concert.id}-${this.diff.id}` : this.mode.kind === 'free' ? `free-${this.diff.id}` : this.bestKey();
+    const best = loadBest(this.mode.kind === 'beat' ? key : `${P}-${key}`);
     const newBest = this.stats.score > best.score;
-    saveBest({ score: Math.max(best.score, this.stats.score), combo: Math.max(best.combo, this.stats.maxCombo) }, this.bestKey());
+    saveBest({ score: Math.max(best.score, this.stats.score), combo: Math.max(best.combo, this.stats.maxCombo) }, this.mode.kind === 'beat' ? key : `${P}-${key}`);
+
+    const attempted = all.filter((s) => s.attempts > 0);
+    const outcomes = attempted.flatMap((s) => s.history);
+    const good = outcomes.filter((o) => o === 'clean' || o === 'rhythm').length;
+    const accuracy = outcomes.length ? good / outcomes.length : 0;
+    let tour: ResultsData['tour'];
+    let level: string;
+    if (this.mode.kind === 'tour') {
+      const c = this.mode.concert;
+      const r = starsFor(accuracy, this.stats.timingPct);
+      this.progress.recordConcert(P, c.id, r.stars, r.passed, this.stats.score);
+      tour = { stars: r.stars, passed: r.passed, accuracyPct: Math.round(accuracy * 100), hasNext: !!nextConcert(c) };
+      level = `BEAT TOUR · ${c.stage.name} · ${c.final ? 'GRAN FINAL' : c.theme ?? c.title} · ${this.diff.label}`;
+    } else if (this.mode.kind === 'free') level = `${this.pack.subtitle.toUpperCase()} · BEAT LIBRE · ${this.diff.label}`;
+    else level = `${this.pack.subtitle.toUpperCase()} · ${this.pack.levels[this.level].name} · ${this.diff.label}`;
+
     this.fsm.transition(GameState.Results);
     const byId = (id: string) => this.pack.byId(id);
     this.ui.results.show(true, {
-      level: `${this.pack.subtitle.toUpperCase()} · ${this.pack.levels[this.level].name} · ${this.diff.label}`,
-      suggestion: this.suggestion(),
+      mode: this.mode.kind,
+      tour,
+      level,
+      suggestion: this.mode.kind === 'beat' ? this.suggestion() : null,
       recognized: this.tracker.recognizedCount(),
-      total: this.pack.levels[this.level].items.length,
+      total: this.mode.kind === 'beat' ? this.pack.levels[this.level].items.length : attempted.length,
       timingPct: this.stats.timingPct,
       maxCombo: this.stats.maxCombo,
       perfect: this.stats.perfect,
@@ -241,7 +395,7 @@ export class Game {
       weak: this.tracker.weakest(3).map((s) => byId(s.id)),
     });
     this.resultsShownAt = performance.now();
-    if (this.opts.debug) console.table(this.tracker.all().map(({ history, confusedWith, ...s }) => ({ ...s, history: history.join(','), confusedWith: JSON.stringify(confusedWith) })));
+    if (this.opts.debug) console.table(all.map(({ history, confusedWith, ...s }) => ({ ...s, history: history.join(','), confusedWith: JSON.stringify(confusedWith) })));
   }
 
   /** Nudge players toward the difficulty that fits them. */
@@ -263,6 +417,8 @@ export class Game {
     this.ui.menu.show(to === GameState.Menu, loadBest(this.bestKey(1)));
     this.ui.stage.show(playing);
     this.ui.calib.show(to === GameState.Calibration);
+    this.ui.tour.show(to === GameState.Tour);
+    this.ui.free.show(to === GameState.Free);
     if (to !== GameState.Results) this.ui.results.show(false);
     if (playing) {
       this.ui.stage.setSection(to);
@@ -332,13 +488,17 @@ export class Game {
   onAction(action: Action, ts: number): void {
     const s = this.fsm.state;
     if (s === GameState.Menu) {
-      if (action === 'confirm' || action === 'hit') this.start(1, false);
+      if (action === 'confirm') this.openTour();
+      else if (action === 'level1') this.start(1, false);
       else if (action === 'level2') this.start(2, false);
-      else if (action === 'calibrate') this.startCalibration();
-      else if (action === 'subject') {
+      else if (action === 'free') this.openFree();
+      else if (action === 'voice') this.toggleVoice();
+      else if (action === 'up' || action === 'down') {
         const i = this.packs.indexOf(this.pack);
         this.setSubject(this.packs[(i + 1) % this.packs.length].id);
-      } else if (action === 'prev' || action === 'next') {
+      }
+      else if (action === 'calibrate') this.startCalibration();
+      else if (action === 'prev' || action === 'next') {
         const i = DIFFICULTY_ORDER.indexOf(this.diff.id) + (action === 'next' ? 1 : -1);
         this.setDifficulty(DIFFICULTY_ORDER[Math.max(0, Math.min(DIFFICULTY_ORDER.length - 1, i))]);
       }
@@ -350,15 +510,27 @@ export class Game {
       else if (action === 'restart') this.startCalibration();
       return;
     }
+    if (s === GameState.Tour) {
+      if (action === 'back') this.toMenu();
+      else if (action === 'confirm') this.ui.tour.confirm();
+      else if (action === 'prev' || action === 'next') this.ui.tour.move(action === 'next' ? 1 : -1, 0);
+      else if (action === 'up' || action === 'down') this.ui.tour.move(0, action === 'down' ? 1 : -1);
+      return;
+    }
+    if (s === GameState.Free) {
+      if (action === 'back') this.toMenu();
+      else if (action === 'confirm') this.ui.free.play();
+      return;
+    }
     if (s === GameState.Results) {
       if (performance.now() - this.resultsShownAt < 900) return;
-      if (action === 'confirm') this.start(this.level, true);
-      else if (action === 'restart' || action === 'back') this.toMenu();
+      if (action === 'confirm') this.nextFromResults();
+      else if (action === 'restart' || action === 'back') this.toHub();
       return;
     }
     if (this.paused) {
       if (action === 'confirm' || action === 'back') this.resume();
-      else if (action === 'restart') this.toMenu();
+      else if (action === 'restart') this.toHub();
       return;
     }
     switch (action) {
@@ -549,6 +721,7 @@ export class Game {
     switch (ev.type) {
       case 'section':
         this.fsm.transition(ev.state);
+        if (ev.label) st.setPill(ev.label);
         break;
       case 'flag':
         st.showFlag(ev.challenge.targets, ev.challenge.hint);

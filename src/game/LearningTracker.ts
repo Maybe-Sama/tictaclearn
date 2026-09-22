@@ -74,6 +74,17 @@ export class LearningTracker {
     }
   }
 
+  /** Long-term weak items: due right away, so they come back early in the session. */
+  boost(ids: string[]): void {
+    for (const id of ids) {
+      const s = this.map.get(id);
+      if (s) {
+        s.pending = Math.max(1, s.pending);
+        s.dueAt = -Infinity;
+      }
+    }
+  }
+
   get(id: string): ItemStats {
     const s = this.map.get(id);
     if (!s) throw new Error(`No stats for ${id}`);

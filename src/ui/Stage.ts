@@ -5,6 +5,7 @@ import { GameState } from '../game/GameStateMachine';
 import { PARTY, type Particles } from './Particles';
 import { PLANET_SVG, STAMP_SVG } from './art';
 import { L, inputWord } from './layout';
+import { speak } from '../util/voice';
 
 /** Stage coordinates come from the active layout (landscape or portrait). */
 const HOP_HEIGHT = 34;
@@ -164,6 +165,11 @@ export class Stage {
     }
   }
 
+  /** Override the HUD pill text (Beat Tour: stage + concert). */
+  setPill(text: string): void {
+    this.sectionName.textContent = text;
+  }
+
   // ------------------------------------------------------------------ per frame
 
   render(now: number, engine: RhythmEngine): void {
@@ -228,7 +234,9 @@ export class Stage {
       tk.innerHTML = `<span class="drum-face">${o.offbeat ? 'y' : ''}</span>`;
     } else {
       // All names of one flag share a tint, so consecutive flags read as groups.
-      tk.className = `tk c${o.challenge.id % 5}`;
+      const label = o.item ? this.pack.answerLabel(o.item) : '';
+      // Long names (SRI JAYAWARDENAPURA KOTTE…) shrink to fit the lane.
+      tk.className = `tk c${o.challenge.id % 5}${label.length > 15 ? ' len-xl' : label.length > 10 ? ' len-l' : ''}`;
       if (o.correct && o.challenge.spec.glowCorrect) tk.classList.add('glow');
       tk.innerHTML = `<span class="tk-flag"></span><span class="tk-name">${o.item ? this.pack.answerLabel(o.item) : ''}</span><span class="tk-ink">★</span>`;
     }
@@ -256,6 +264,7 @@ export class Stage {
     group.appendChild(this.flagCard(item));
     this.swapFlag(group);
     this.setLabel(this.pack.answerLabel(item), 'teach');
+    speak(this.pack.spoken(item));
     this.fx.burst(L.flagX, L.flagY, { n: 10, shape: 'star', speed: 520, size: 16 });
   }
 
@@ -283,7 +292,7 @@ export class Stage {
     const card = document.createElement('div');
     card.className = 'flag-card';
     const caption = this.pack.promptCaption?.(item);
-    card.innerHTML = `<div class="flag-art">${this.pack.renderPrompt(item)}</div>${caption ? `<div class="prompt-caption">${caption}</div>` : ''}<div class="eyes"><i><b></b></i><i><b></b></i></div>`;
+    card.innerHTML = `<div class="flag-art">${this.pack.renderPrompt(item)}</div>${caption ? `<div class="prompt-caption${caption.length > 14 ? ' long' : ''}">${caption}</div>` : ''}<div class="eyes"><i><b></b></i><i><b></b></i></div>`;
     return card;
   }
 
@@ -307,7 +316,7 @@ export class Stage {
   }
 
   private setLabel(text: string, mode: 'hint' | 'teach'): void {
-    this.label.className = `flag-label ${mode}${text ? ' show' : ''}`;
+    this.label.className = `flag-label ${mode}${text ? ' show' : ''}${text.length > 16 ? ' long' : ''}`;
     this.label.textContent = text;
     if (text) {
       this.label.animate(

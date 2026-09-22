@@ -16,6 +16,9 @@ export class Menu {
   readonly root: HTMLDivElement;
   onPlay: () => void = () => {};
   onPlay2: () => void = () => {};
+  onTour: () => void = () => {};
+  onFree: () => void = () => {};
+  onVoice: () => void = () => {};
   onCalibrate: () => void = () => {};
   onDifficulty: (id: DifficultyId) => void = () => {};
   onSubject: (id: string) => void = () => {};
@@ -50,10 +53,15 @@ export class Menu {
          ${DIFFICULTY_ORDER.map((id) => `<button class="diff d-${id}" type="button" role="radio" data-id="${id}">${DIFFICULTIES[id].label}</button>`).join('')}
        </div>
        <p class="diff-desc"></p>
-       <button class="btn-play" type="button">JUGAR</button>
+       <button class="btn-play btn-tour" type="button">BEAT TOUR <small>ENTER</small></button>
        <div class="menu-row">
+         <button class="btn-level1" type="button">BEAT 1 <small>1</small></button>
          <button class="btn-level2" type="button"><span class="l2-name"></span> <small>2</small></button>
+         <button class="btn-free" type="button">BEAT LIBRE <small>L</small></button>
+       </div>
+       <div class="menu-row small">
          <button class="btn-calibrate" type="button">AJUSTAR RITMO <small>C</small></button>
+         <button class="btn-voice" type="button">VOZ <b class="voice-state"></b> <small>V</small></button>
        </div>
        <p class="menu-hint"><span class="rule"></span>. ${TOUCH ? 'Toca la pantalla' : 'Todo con <kbd>ESPACIO</kbd>'}, al ritmo.</p>
        <p class="menu-best"></p>`,
@@ -75,25 +83,27 @@ export class Menu {
         this.onDifficulty(b.dataset.id as DifficultyId);
       }),
     );
-    const btn = this.root.querySelector<HTMLButtonElement>('.btn-play')!;
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      btn.blur();
-      this.onPlay();
-    });
     const wire = (sel: string, fn: () => void): void =>
       this.root.querySelector<HTMLButtonElement>(sel)!.addEventListener('click', (e) => {
         e.stopPropagation();
         (e.currentTarget as HTMLButtonElement).blur();
         fn();
       });
+    wire('.btn-tour', () => this.onTour());
+    wire('.btn-level1', () => this.onPlay());
     wire('.btn-level2', () => this.onPlay2());
+    wire('.btn-free', () => this.onFree());
+    wire('.btn-voice', () => this.onVoice());
     wire('.btn-calibrate', () => this.onCalibrate());
   }
 
   show(v: boolean, best?: { score: number; combo: number }): void {
     this.root.classList.toggle('hidden', !v);
     if (v) this.best.textContent = best && best.score > 0 ? `Récord en esta dificultad: ${best.score.toLocaleString('es-ES')} · mejor combo ${best.combo}` : '';
+  }
+
+  setVoice(on: boolean): void {
+    this.root.querySelector('.voice-state')!.textContent = on ? 'SÍ' : 'NO';
   }
 
   setSubject(pack: ContentPack): void {
@@ -118,6 +128,9 @@ export class Menu {
 }
 
 export interface ResultsData {
+  mode: 'beat' | 'tour' | 'free';
+  /** Beat Tour outcome. */
+  tour?: { stars: number; passed: boolean; accuracyPct: number; hasNext: boolean };
   level: string;
   suggestion: string | null;
   bestStreak: number;
@@ -139,6 +152,7 @@ export class ResultsScreen {
   readonly root: HTMLDivElement;
   onAgain: () => void = () => {};
   onRestart: () => void = () => {};
+  onNext: () => void = () => {};
 
   constructor(
     host: HTMLElement,
@@ -159,7 +173,7 @@ export class ResultsScreen {
     const bubble = (label: string, value: string, color: string, i: number): string => `<div class="rs-bubble" style="--bc:${color};--i:${i}"><b data-count="${value}">${value}</b><span>${label}</span></div>`;
     this.root.innerHTML = `
       <h1 class="rs-title"><span>BEAT</span><span>COMPLETE</span></h1>
-      <p class="rs-level">${d.level}</p>${d.suggestion ? `<p class="rs-suggest">${d.suggestion}</p>` : ''}
+      <p class="rs-level">${d.level}</p>${d.tour ? this.tourBanner(d.tour) : d.suggestion ? `<p class="rs-suggest">${d.suggestion}</p>` : ''}
       <div class="rs-body">
         <div class="rs-left">
           <div class="rs-big"><div class="rs-big-num"><b>${d.recognized}</b><small>/${d.total}</small></div><div class="rs-big-label">${this.pack.noun}<br>reconocidas</div></div>
@@ -179,21 +193,35 @@ export class ResultsScreen {
           <div class="rs-row weak">${d.weak.length ? d.weak.map((w) => mini(w, true)).join('') : '<p class="rs-empty">Nada. Las clavaste todas.</p>'}</div>
         </div>
       </div>
-      <div class="rs-buttons">
-        <button class="btn-again" type="button">OTRA VEZ <small>ENTER</small></button>
-        <button class="btn-restart" type="button">REINICIAR <small>R</small></button>
-      </div>`;
-    const again = this.root.querySelector<HTMLButtonElement>('.btn-again')!;
-    const restart = this.root.querySelector<HTMLButtonElement>('.btn-restart')!;
-    again.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.onAgain();
-    });
-    restart.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.onRestart();
-    });
+      <div class="rs-buttons">${this.buttons(d)}</div>`;
+    this.root.querySelectorAll<HTMLButtonElement>('.rs-buttons [data-act]').forEach((b) =>
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const act = b.dataset.act;
+        if (act === 'next') this.onNext();
+        else if (act === 'again') this.onAgain();
+        else this.onRestart();
+      }),
+    );
   }
+
+  private tourBanner(t: NonNullable<ResultsData['tour']>): string {
+    const msg = t.passed ? (t.stars === 3 ? '¡CONCIERTO PERFECTO!' : '¡CONCIERTO SUPERADO!') : `Casi… ${t.accuracyPct} % · necesitas un 70 %`;
+    return `<div class="rs-tour${t.passed ? ' passed' : ''}"><span class="rs-stars">${'★'.repeat(t.stars)}<i>${'★'.repeat(3 - t.stars)}</i></span><b>${msg}</b></div>`;
+  }
+
+  /** Big = primary (ENTER), small = secondary. */
+  private buttons(d: ResultsData): string {
+    const big = (act: string, label: string): string => `<button class="btn-again" type="button" data-act="${act}">${label} <small>ENTER</small></button>`;
+    const small = (act: string, label: string, key = ''): string => `<button class="btn-restart" type="button" data-act="${act}">${label}${key ? ` <small>${key}</small>` : ''}</button>`;
+    if (d.mode === 'tour') {
+      const next = !!(d.tour?.passed && d.tour.hasNext);
+      return next ? big('next', 'SIGUIENTE') + small('again', 'OTRA VEZ') + small('hub', 'GIRA', 'R') : big('again', 'OTRA VEZ') + small('hub', 'GIRA', 'R');
+    }
+    if (d.mode === 'free') return big('again', 'OTRA VEZ') + small('hub', 'BEAT LIBRE', 'R');
+    return big('again', 'OTRA VEZ') + small('hub', 'REINICIAR', 'R');
+  }
+
 }
 
 export class PauseOverlay {

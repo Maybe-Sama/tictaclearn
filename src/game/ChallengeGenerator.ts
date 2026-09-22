@@ -77,6 +77,8 @@ export interface ChallengeOptions {
 export class ChallengeGenerator {
   /** Heard-clock time of the phrase being generated (set by the setlist). */
   now = 0;
+  /** Chance to pull a look-alike (flag or capital) in as a distractor. 0 = off. */
+  lookalikeRate = 0;
   private lastTargets: string[] = [];
   private lastIdx = -1;
   private seen = new Set<string>();
@@ -223,6 +225,12 @@ export class ChallengeGenerator {
       shuffle(t.decoys ?? []).forEach((label, k) => {
         if (Math.random() < (k === 0 ? 0.85 : 0.45)) add(this.decoy(label));
       });
+      // "Is this Italy… or Mexico?" — the confusions worth practising.
+      shuffle(t.lookalikes ?? [])
+        .slice(0, 2)
+        .forEach((id) => {
+          if (Math.random() < this.lookalikeRate) add(pool.find((i) => i.id === id) ?? this.allItems.find((i) => i.id === id));
+        });
     }
     if (prefer) for (const it of shuffle(prefer).slice(0, Math.ceil(count / 2) + 1)) add(it);
     for (const it of shuffle(pool)) add(it);
