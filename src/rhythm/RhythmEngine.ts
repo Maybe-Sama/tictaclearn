@@ -33,11 +33,11 @@ export class RhythmEngine {
   lateNotes = 0;
   maxLateMs = 0;
   /**
-   * Asked ~120 ms before each drum: should its sound be pre-scheduled on the
-   * exact beat? (Yes while the player is in the groove.) Input-triggered sounds
-   * always arrive one output-latency late; pre-scheduled ones are sample-accurate.
+   * Asked ~120 ms before each drum: at what volume to pre-schedule its sound
+   * on the exact beat (0 = don't). Input-triggered sounds always arrive one
+   * output-latency late (a lot on phones); pre-scheduled ones are sample-accurate.
    */
-  prePlay: (o: ChallengeOption) => boolean = () => false;
+  prePlay: (o: ChallengeOption) => number = () => 1;
   private audioQ: { time: number; fn: (t: number) => void }[] = [];
   private visualQ: TimedVisual[] = [];
   private nextStart = 0;
@@ -200,9 +200,10 @@ export class RhythmEngine {
         this.pushAudio(time, (tt) => this.audio.guide(tt, offbeat));
         const opt = c.options[c.options.length - 1];
         this.pushAudio(time, (tt) => {
-          if (opt.state === 'pending' && (spec.demo || this.prePlay(opt))) {
+          const v = spec.demo ? 1 : this.prePlay(opt);
+          if (opt.state === 'pending' && v > 0) {
             opt.prePlayed = true;
-            this.audio.drumHit(tt, offbeat, !!o.bell, 1);
+            this.audio.drumHit(tt, offbeat, !!o.bell, v);
           }
         });
         return;

@@ -1,11 +1,12 @@
 /**
- * Spoken names when a country is taught (Web Speech API, offline on most
- * devices). Silent no-op where unsupported. The toggle is remembered.
+ * Spoken names when a country is taught (Web Speech API). OFF by default:
+ * on phones the speech engine can grab the audio output and knock the music
+ * off the beat. Opt-in from Ajustes; the choice is remembered.
  */
 const KEY = 'worldbeat.voice';
-let enabled = true;
+let enabled = false;
 try {
-  enabled = localStorage.getItem(KEY) !== 'off';
+  enabled = localStorage.getItem(KEY) === 'on';
 } catch {
   /* ignore */
 }

@@ -166,7 +166,15 @@ export class Game {
 
   private ensureAudio(): AudioEngine {
     // Created/resumed inside the user gesture that called us.
-    if (!this.audio) this.audio = new AudioEngine();
+    if (!this.audio) {
+      this.audio = new AudioEngine();
+      // If the phone takes the audio away (call, system sound, speech), pause
+      // cleanly instead of letting the song drift; SEGUIR resumes on the beat.
+      const ctx = this.audio.ctx;
+      ctx.addEventListener('statechange', () => {
+        if (this.playing && !this.paused && ctx.state !== 'running') this.pause();
+      });
+    }
     void this.audio.resume();
     this.audio.resetBuses();
     this.audio.inputOffsetMs = loadOffset();
@@ -334,10 +342,16 @@ export class Game {
     this.engine.start(a.ctx.currentTime + 0.35);
   }
 
-  /** In the groove = the last thing you played was a hit. Then your drums are pre-scheduled on the beat. */
-  private inGroove(o: ChallengeOption): boolean {
-    if (!this.playing || this.paused) return false;
-    return o.challenge.scored ? this.stats.combo > 0 : this.practiceStep > 0;
+  /**
+   * Every drum is pre-scheduled exactly on its beat, so the drum line is always
+   * in time (a press-triggered sound would land one output-latency late, very
+   * noticeable on phones). In the groove it plays full; after a miss, softer
+   * until you land the next one: you hear the groove drop without losing time.
+   */
+  private inGroove(o: ChallengeOption): number {
+    if (!this.playing || this.paused) return 0;
+    const grooving = o.challenge.scored ? this.stats.combo > 0 : this.practiceStep > 0;
+    return grooving ? 1 : 0.4;
   }
 
   toMenu(): void {
@@ -593,8 +607,12 @@ export class Game {
     if (!this.audio || !this.judge || !this.playing || this.paused) return;
     this.ui.stage.stamp();
     const j = this.judge.judgeInput(inputTime);
-    // Drums answer with a drum; countries get the rubber stamp, snapped onto the beat when you were on time.
-    if (!(j.drum && j.grade !== 'miss')) this.audio.stampThunk(this.soundTime(j), j.drum ? 0.4 : 0.8);
+    // Drums already sound on the beat. The stamp is percussive: only play it when it can land on the
+    // beat (you pressed on time or early); a late thunk would flam against the music.
+    const hit = j.grade !== 'miss';
+    const onBeat = !!j.option && j.option.time >= this.audio.ctx.currentTime;
+    if (!j.drum && (!hit || onBeat)) this.audio.stampThunk(this.soundTime(j), 0.8);
+    else if (j.drum && !hit) this.audio.stampThunk(this.audio.ctx.currentTime, 0.4);
     this.apply(j);
   }
 

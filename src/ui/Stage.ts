@@ -50,6 +50,18 @@ function hop(b: number, reduced: boolean, offbeat = false): { pos: number; lift:
   return { pos: (k - e) / 2, lift: arc * onBeat, sx: 1 - 0.04 * arc, sy: 1 + 0.08 * arc };
 }
 
+/**
+ * Shrink text until it fits its box (long single words like BARCELONA can't
+ * wrap). Measures real overflow, so it works for any font and any name.
+ */
+function fitText(el: HTMLElement, minPx: number): void {
+  let size = parseFloat(getComputedStyle(el).fontSize);
+  for (let i = 0; i < 10 && size > minPx && (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1); i++) {
+    size -= 2;
+    el.style.fontSize = `${size}px`;
+  }
+}
+
 export class Stage {
   readonly root: HTMLDivElement;
   private flagSlot: HTMLDivElement;
@@ -174,7 +186,7 @@ export class Stage {
 
   render(now: number, engine: RhythmEngine): void {
     const info = engine.beatInfo(now);
-    const root = document.documentElement;
+    const root = this.root;
     if (info) {
       const phase = info.beat - Math.floor(info.beat);
       const pulse = Math.exp(-phase * 5);
@@ -243,6 +255,7 @@ export class Stage {
     el.appendChild(tk);
     el.style.opacity = '0';
     this.tokensEl.appendChild(el);
+    if (o.kind === 'answer') fitText(tk, 16);
     return { el, tk, detached: false };
   }
 
@@ -254,6 +267,7 @@ export class Stage {
     group.className = `flag-group n${targets.length}`;
     for (const t of targets) group.appendChild(this.flagCard(t));
     this.swapFlag(group);
+    group.querySelectorAll<HTMLElement>('.prompt-caption').forEach((c) => fitText(c, 14));
     this.setLabel(hint ? targets.map((t) => this.pack.answerLabel(t)).join(' + ') : '', 'hint');
   }
 
@@ -263,6 +277,7 @@ export class Stage {
     group.className = 'flag-group n1 teach';
     group.appendChild(this.flagCard(item));
     this.swapFlag(group);
+    group.querySelectorAll<HTMLElement>('.prompt-caption').forEach((c) => fitText(c, 14));
     this.setLabel(this.pack.answerLabel(item), 'teach');
     speak(this.pack.spoken(item));
     this.fx.burst(L.flagX, L.flagY, { n: 10, shape: 'star', speed: 520, size: 16 });
@@ -318,7 +333,9 @@ export class Stage {
   private setLabel(text: string, mode: 'hint' | 'teach'): void {
     this.label.className = `flag-label ${mode}${text ? ' show' : ''}${text.length > 16 ? ' long' : ''}`;
     this.label.textContent = text;
+    this.label.style.fontSize = '';
     if (text) {
+      fitText(this.label, 20);
       this.label.animate(
         [
           { transform: 'translateY(-50%) scale(.3) rotate(-8deg)', opacity: 0 },
@@ -517,7 +534,7 @@ export class Stage {
           ? [{ transform: 'scale(1)' }, { transform: 'scale(1.1)', offset: 0.4 }, { transform: 'scale(1)' }]
           : kind === 'huh'
             ? [{ transform: 'rotate(0)' }, { transform: 'rotate(-9deg)' }, { transform: 'rotate(7deg)' }, { transform: 'rotate(-4deg)' }, { transform: 'rotate(0)' }]
-            : [{ transform: 'rotateY(0) rotate(0)' }, { transform: 'rotateY(360deg) rotate(-12deg)', offset: 0.7 }, { transform: 'rotateY(360deg) rotate(0)' }];
+            : [{ transform: 'rotate(0) scale(1)' }, { transform: 'rotate(-14deg) scale(.92)', offset: 0.25 }, { transform: 'rotate(12deg) scale(.95)', offset: 0.55 }, { transform: 'rotate(-5deg)', offset: 0.8 }, { transform: 'rotate(0) scale(1)' }];
     slot.animate(frames, { duration: kind === 'perfect' ? 320 : kind === 'dizzy' ? 700 : 320, easing: 'cubic-bezier(.3,1.4,.5,1)' });
   }
 
@@ -550,6 +567,7 @@ export class Stage {
   private tokenReveal(tok: Token, item: LearningItem): void {
     tok.tk.classList.add('reveal');
     tok.tk.querySelector('.tk-flag')!.innerHTML = this.pack.renderPrompt(item);
+    fitText(tok.tk, 14);
     tok.tk.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.18)' }, { transform: 'scale(1)' }], { duration: 360, easing: 'ease-out' });
   }
 

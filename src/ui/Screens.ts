@@ -88,7 +88,7 @@ export class Menu {
              <button class="btn-voice" type="button">VOZ: <b class="voice-state"></b></button>
              <button class="btn-calibrate" type="button">AJUSTAR RITMO</button>
            </div>
-           <p class="sheet-note">¿Los golpes no cuadran con la música? Usa <b>Ajustar ritmo</b> (10 s).</p>
+           <p class="sheet-note">¿Los golpes no cuadran con la música? Usa <b>Ajustar ritmo</b> (10 s).<br>La voz lee cada país nuevo; en algunos móviles puede descuadrar el ritmo.</p>
            <p class="menu-best"></p>
            <button class="btn-sheet-close" type="button">LISTO</button>
          </div>
