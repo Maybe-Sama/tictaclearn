@@ -1664,3 +1664,28 @@ body.portrait .free-foot { font-size: 26px; }
 body.portrait .legend { font-size: 20px; }
 /* A revealed answer shows its flag above the name, so the name keeps its width. */
 .tk.reveal { flex-direction: column; gap: 4px; padding-top: 8px; }
+
+/* ---- in-game voice toggle, next to pause */
+.btn-voice-hud {
+  position: absolute;
+  right: 106px;
+  top: 28px;
+  z-index: 13;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border: 5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--sun);
+  color: var(--ink);
+  box-shadow: 0 6px 0 var(--ink);
+}
+.btn-voice-hud svg { width: 34px; height: 34px; }
+.btn-voice-hud .v-off { display: none; }
+.btn-voice-hud.off { background: var(--cream); color: rgba(36, 22, 67, 0.55); }
+.btn-voice-hud.off .v-on { display: none; }
+.btn-voice-hud.off .v-off { display: inline; }
+.btn-voice-hud:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
+body.portrait .btn-voice-hud { width: 80px; height: 80px; right: 124px; }
+body.portrait .btn-voice-hud svg { width: 42px; height: 42px; }

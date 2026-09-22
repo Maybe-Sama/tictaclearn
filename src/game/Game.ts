@@ -109,6 +109,8 @@ export class Game {
     ui.menu.onFree = () => this.openFree();
     ui.menu.onVoice = () => this.toggleVoice();
     ui.menu.setVoice(voiceEnabled());
+    ui.stage.onVoice = () => this.toggleVoice();
+    ui.stage.setVoice(voiceEnabled());
     ui.menu.onCalibrate = () => this.startCalibration();
     ui.tour.onBack = () => this.toMenu();
     ui.tour.onPlay = (c) => this.startConcert(c);
@@ -223,6 +225,7 @@ export class Game {
   private toggleVoice(): void {
     setVoice(!voiceEnabled());
     this.ui.menu.setVoice(voiceEnabled());
+    this.ui.stage.setVoice(voiceEnabled());
   }
 
   /** Back to wherever this session came from. */
@@ -579,6 +582,9 @@ export class Game {
         break;
       case 'back':
         this.pause();
+        break;
+      case 'voice':
+        this.toggleVoice();
         break;
       case 'skip':
         if (this.opts.debug) this.setlist?.skipSection();

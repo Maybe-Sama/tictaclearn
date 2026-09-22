@@ -102,6 +102,7 @@ export class Stage {
         <div class="pill score-pill"><span class="score-num">0</span></div>
       </div>
       <button class="btn-pause" type="button" aria-label="Pausa"><i></i><i></i></button>
+      <button class="btn-voice-hud" type="button" aria-label="Voz" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 12h5l7-6v20l-7-6H5z" fill="currentColor"/><path class="v-on" d="M21 11c2 2 2 8 0 10M24.5 8c4 4 4 12 0 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path class="v-off" d="M21 12l8 8M29 12l-8 8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
       <div class="dj" aria-hidden="true"><div class="dj-body">${PLANET_SVG}</div><div class="dj-shadow"></div></div>
       <div class="combo"><b class="combo-num">0</b><span>COMBO</span></div>
       <div class="milestone"></div>
@@ -139,6 +140,11 @@ export class Stage {
     this.dj = q('.dj');
     this.sectionName = q('.section-name');
     this.scoreNum = q('.score-num');
+    q<HTMLButtonElement>('.btn-voice-hud').addEventListener('click', (e) => {
+      e.stopPropagation();
+      (e.currentTarget as HTMLButtonElement).blur();
+      this.onVoice();
+    });
     q<HTMLButtonElement>('.btn-pause').addEventListener('click', (e) => {
       e.stopPropagation();
       (e.currentTarget as HTMLButtonElement).blur();
@@ -147,6 +153,7 @@ export class Stage {
   }
 
   onPause: () => void = () => {};
+  onVoice: () => void = () => {};
 
   show(v: boolean): void {
     this.root.classList.toggle('hidden', !v);
@@ -175,6 +182,14 @@ export class Stage {
       this.sectionName.textContent = name;
       this.sectionName.parentElement!.animate([{ transform: 'scale(.6)' }, { transform: 'scale(1.1)' }, { transform: 'scale(1)' }], { duration: 300, easing: 'ease-out' });
     }
+  }
+
+  /** In-game voice toggle: speaker with waves = on, crossed = off. */
+  setVoice(on: boolean): void {
+    const b = this.root.querySelector<HTMLButtonElement>('.btn-voice-hud')!;
+    b.classList.toggle('off', !on);
+    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', on ? 'Voz activada' : 'Voz desactivada');
   }
 
   /** Override the HUD pill text (Beat Tour: stage + concert). */
