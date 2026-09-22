@@ -102,7 +102,10 @@ export class Stage {
         <div class="pill score-pill"><span class="score-num">0</span></div>
       </div>
       <button class="btn-pause" type="button" aria-label="Pausa"><i></i><i></i></button>
-      <button class="btn-voice-hud" type="button" aria-label="Voz" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 12h5l7-6v20l-7-6H5z" fill="currentColor"/><path class="v-on" d="M21 11c2 2 2 8 0 10M24.5 8c4 4 4 12 0 16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path class="v-off" d="M21 12l8 8M29 12l-8 8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
+      <button class="btn-voice-hud" type="button" aria-label="Voz que dice los países" aria-pressed="false">
+        <svg viewBox="0 0 32 26" aria-hidden="true"><path d="M4 3h24v15H13l-7 6v-6H4z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="11" cy="10.5" r="2" fill="currentColor"/><circle cx="16" cy="10.5" r="2" fill="currentColor"/><circle cx="21" cy="10.5" r="2" fill="currentColor"/></svg>
+        <span class="vh-label">VOZ</span><i class="vh-switch"></i>
+      </button>
       <div class="dj" aria-hidden="true"><div class="dj-body">${PLANET_SVG}</div><div class="dj-shadow"></div></div>
       <div class="combo"><b class="combo-num">0</b><span>COMBO</span></div>
       <div class="milestone"></div>
@@ -184,6 +187,35 @@ export class Stage {
     }
   }
 
+  /**
+   * The beat "breath" (rings, planet, dots, pad, flag). One short compositor
+   * animation per beat: no per-frame style work (an inherited CSS variable
+   * updated every frame used to restyle the whole stage 60 times a second).
+   */
+  private pulseEls: { el: HTMLElement; frames: Keyframe[] }[] | null = null;
+
+  private beatPulse(beat: number, beatDur: number): void {
+    if (this.reduced) return;
+    if (!this.pulseEls) {
+      const q = (sel: string) => [...this.root.querySelectorAll<HTMLElement>(sel)];
+      const kick = (base: string, peak: string): Keyframe[] => [{ transform: `${base} ${peak}` }, { transform: `${base}` }];
+      this.pulseEls = [
+        ...q('.halo i').map((el, i) => ({ el, frames: kick('translate(-50%, -50%)', `scale(${[1.05, 1.035, 1.025, 1.018][i]})`) })),
+        ...q('.dot').map((el) => ({ el, frames: kick('translate(-50%, -50%)', 'scale(1.5)') })),
+        { el: q('.pad i')[0], frames: kick('', 'scale(1.1) rotate(20deg)') },
+        { el: q('.flag-stage')[0], frames: kick('', 'translateY(-6px)') },
+        { el: q('.dj-body')[0], frames: kick('', 'translateY(-16px) scale(1.05, .95)') },
+        { el: q('.dj-shadow')[0], frames: kick('translateX(-50%)', 'scale(.85)') },
+        { el: q('.section-pill .note')[0], frames: kick('', 'scale(1.25)') },
+        { el: q('.fever-badge')[0], frames: kick('translate(-50%, -50%) rotate(-4deg)', 'scale(1.12)') },
+      ].filter((x) => x.el);
+    }
+    const duration = Math.max(120, beatDur * 850);
+    for (const { el, frames } of this.pulseEls) el.animate(frames, { duration, easing: 'cubic-bezier(.15,.8,.3,1)' });
+    // The planet sways left/right on alternate beats when the groove is on.
+    this.dj.classList.toggle('sway-left', beat % 2 === 0);
+  }
+
   /** In-game voice toggle: speaker with waves = on, crossed = off. */
   setVoice(on: boolean): void {
     const b = this.root.querySelector<HTMLButtonElement>('.btn-voice-hud')!;
@@ -201,22 +233,18 @@ export class Stage {
 
   render(now: number, engine: RhythmEngine): void {
     const info = engine.beatInfo(now);
-    const root = this.root;
     if (info) {
-      const phase = info.beat - Math.floor(info.beat);
-      const pulse = Math.exp(-phase * 5);
-      root.style.setProperty('--pulse', pulse.toFixed(3));
       const gb = Math.floor(info.globalBeat + 1e-6);
       if (gb !== this.lastBeat) {
         this.lastBeat = gb;
-        this.root.dataset.parity = gb % 2 ? 'odd' : 'even';
+        this.beatPulse(gb, info.sp.beatDur);
       }
       const hush = !!info.sp.phrase.dropBeats?.includes(Math.floor(info.beat));
       if (hush !== this.hush) {
         this.hush = hush;
         this.root.classList.toggle('hush', hush);
       }
-    } else root.style.setProperty('--pulse', '0');
+    }
 
     for (const c of engine.challenges) {
       for (const o of c.options) {

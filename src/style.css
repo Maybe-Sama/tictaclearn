@@ -58,8 +58,22 @@ body[data-section='Results'] { --bg1: #a98bff; }
   background-color: var(--bg1);
   background-image: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.35), transparent 60%),
     repeating-conic-gradient(from 0deg at 35% 35%, rgba(255, 255, 255, 0.07) 0 10deg, transparent 10deg 20deg);
-  transition: background-color 0.8s ease;
 }
+
+/* FEVER's night sky is a separate layer faded in by the compositor, instead of
+   repainting the full-screen gradient of #bg. */
+#bg-fever {
+  position: fixed;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  background-color: #2b0f63;
+  background-image: radial-gradient(circle at 35% 35%, rgba(255, 93, 143, 0.45), transparent 60%),
+    repeating-conic-gradient(from 0deg at 35% 35%, rgba(255, 210, 63, 0.14) 0 10deg, transparent 10deg 20deg);
+  will-change: opacity;
+}
+body.fever-mode #bg-fever { opacity: 1; }
 
 #stage {
   position: absolute;
@@ -179,7 +193,7 @@ kbd {
   background: var(--pink);
   color: #fff;
   font-size: 20px;
-  transform: scale(calc(1 + var(--pulse) * 0.25));
+  transform: none;
 }
 .score-pill { font-size: 22px; padding: 4px 18px 6px; opacity: 0.9; }
 
@@ -196,8 +210,8 @@ kbd {
   top: 0;
   border-radius: 50%;
   border: 26px solid var(--ring);
-  transform: translate(-50%, -50%) scale(calc(1 + var(--pulse) * var(--k)));
-  transition: border-color 0.5s, opacity 0.3s;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.3s;
 }
 .halo i:nth-child(1) { width: 470px; height: 470px; --k: 0.05; background: rgba(255, 255, 255, 0.28); border-color: rgba(255, 255, 255, 0.45); }
 .halo i:nth-child(2) { width: 720px; height: 720px; --k: 0.035; }
@@ -221,7 +235,7 @@ kbd {
   left: var(--flag-x);
   top: var(--flag-y);
   z-index: 6;
-  transform: translateY(calc(var(--pulse) * -6px));
+  transform: none;
 }
 .flag-slot {
   position: absolute;
@@ -376,7 +390,7 @@ kbd {
 .dj-body {
   width: 100%;
   height: 100%;
-  transform: translateY(calc(var(--pulse) * -16px)) scale(calc(1 + var(--pulse) * 0.05), calc(1 - var(--pulse) * 0.05));
+  transform: none;
   transition: rotate 0.12s ease-out;
 }
 .dj-shadow {
@@ -387,15 +401,15 @@ kbd {
   height: 22px;
   border-radius: 50%;
   background: rgba(36, 22, 67, 0.18);
-  transform: translateX(-50%) scale(calc(1 - var(--pulse) * 0.15));
+  transform: translateX(-50%);
 }
 .planet-svg { width: 100%; height: 100%; overflow: visible; }
 .pl-shades { opacity: 0; transition: opacity 0.2s; }
 .dj.fever .pl-shades { opacity: 1; }
 .dj.groovy { --planet: #ff5d8f; }
 .dj.fever { --planet: #16c2a3; }
-.game[data-parity='odd'] .dj.groovy .dj-body { rotate: 12deg; }
-.game[data-parity='even'] .dj.groovy .dj-body { rotate: -12deg; }
+.dj.groovy .dj-body { rotate: 12deg; }
+.dj.groovy.sway-left .dj-body { rotate: -12deg; }
 .dj.fever .dj-body { filter: drop-shadow(0 0 22px rgba(255, 255, 255, 0.8)); }
 
 .combo {
@@ -472,7 +486,7 @@ kbd {
   height: 26px;
   border-radius: 50%;
   background: rgba(36, 22, 67, 0.2);
-  transform: translate(-50%, -50%) scale(calc(1 + var(--pulse) * 0.5));
+  transform: translate(-50%, -50%);
 }
 .pad {
   position: absolute;
@@ -491,7 +505,7 @@ kbd {
   inset: 14px;
   border-radius: 50%;
   border: 6px dashed rgba(36, 22, 67, 0.4);
-  transform: scale(calc(1 + var(--pulse) * 0.1)) rotate(calc(var(--pulse) * 20deg));
+  transform: none;
 }
 body[data-section='FinalGroove'] .pad { background: var(--pink); }
 
@@ -930,7 +944,7 @@ body[data-section='FinalGroove'] .banner.title::before { background: repeating-l
   .dj-body, .flag-stage, .halo i, .pad i, .dot { transform: none; }
   .halo i { transform: translate(-50%, -50%); }
   .dot { transform: translate(-50%, -50%); }
-  .game[data-parity] .dj.groovy .dj-body { rotate: 0deg; }
+  .dj.groovy .dj-body, .dj.groovy.sway-left .dj-body { rotate: 0deg; }
 }
 
 /* ============================================================ v2: drums, fever, flash, calibration */
@@ -1011,7 +1025,7 @@ body[data-section='FinalGroove'] .banner.title::before { background: repeating-l
   left: var(--dj-x);
   top: calc(var(--dj-y) + 290px);
   z-index: 12;
-  transform: translate(-50%, -50%) rotate(-4deg) scale(calc(1 + var(--pulse) * 0.12));
+  transform: translate(-50%, -50%) rotate(-4deg);
   padding: 6px 22px 10px;
   border: 5px solid var(--ink);
   border-radius: 999px;
@@ -1025,13 +1039,6 @@ body[data-section='FinalGroove'] .banner.title::before { background: repeating-l
 }
 .fever-badge b { color: var(--sun); }
 .game.fever-mode .fever-badge { display: block; }
-body.fever-mode #bg {
-  background-color: #2b0f63;
-  background-image: radial-gradient(circle at 35% 35%, rgba(255, 93, 143, 0.45), transparent 60%),
-    repeating-conic-gradient(from calc(var(--pulse) * 12deg) at 35% 35%, rgba(255, 210, 63, 0.14) 0 10deg, transparent 10deg 20deg);
-}
-.game.fever-mode .halo i { border-color: rgba(255, 210, 63, 0.35); }
-.game.fever-mode .halo i:nth-child(odd) { border-color: rgba(255, 93, 143, 0.4); }
 .game.fever-mode .track {
   background: repeating-linear-gradient(90deg, rgba(255, 93, 143, 0.25) 0 40px, rgba(255, 210, 63, 0.25) 40px 80px, rgba(22, 194, 163, 0.25) 80px 120px), var(--cream);
 }
@@ -1632,10 +1639,6 @@ body.portrait .sheet-row .btn-voice, body.portrait .sheet-row .btn-calibrate { f
 .halo i, .token, .flag-slot, .flag-group, .flag-stage, .dj-body, .dj-shadow, .stamp, .pad, .pad i, .dot, .keycap, .fever-badge { will-change: transform; }
 .flag-slot { perspective: none; }
 /* FEVER background: static (it used to repaint the whole screen every frame). */
-body.fever-mode #bg {
-  background-image: radial-gradient(circle at 35% 35%, rgba(255, 93, 143, 0.45), transparent 60%),
-    repeating-conic-gradient(from 0deg at 35% 35%, rgba(255, 210, 63, 0.14) 0 10deg, transparent 10deg 20deg);
-}
 .dj.fever .dj-body { filter: none; }
 /* Boxes that fitText() measures need a real width and hidden overflow. */
 .tk:not(.drum) { overflow-wrap: normal; word-break: keep-all; }
@@ -1665,27 +1668,53 @@ body.portrait .legend { font-size: 20px; }
 /* A revealed answer shows its flag above the name, so the name keeps its width. */
 .tk.reveal { flex-direction: column; gap: 4px; padding-top: 8px; }
 
-/* ---- in-game voice toggle, next to pause */
+/* ---- in-game voice toggle: says what it toggles (the spoken country names) */
 .btn-voice-hud {
   position: absolute;
   right: 106px;
   top: 28px;
   z-index: 13;
-  width: 64px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   height: 64px;
-  display: grid;
-  place-items: center;
+  padding: 0 14px;
   border: 5px solid var(--ink);
-  border-radius: 50%;
-  background: var(--sun);
+  border-radius: 999px;
+  background: var(--cream);
   color: var(--ink);
   box-shadow: 0 6px 0 var(--ink);
+  font-size: 20px;
+  letter-spacing: 1px;
 }
-.btn-voice-hud svg { width: 34px; height: 34px; }
-.btn-voice-hud .v-off { display: none; }
-.btn-voice-hud.off { background: var(--cream); color: rgba(36, 22, 67, 0.55); }
-.btn-voice-hud.off .v-on { display: none; }
-.btn-voice-hud.off .v-off { display: inline; }
+.btn-voice-hud svg { width: 28px; height: 23px; }
+.btn-voice-hud .vh-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border: 4px solid var(--ink);
+  border-radius: 999px;
+  background: var(--teal);
+  transition: background-color 0.15s;
+}
+.btn-voice-hud .vh-switch::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 19px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  transition: left 0.15s ease;
+}
+.btn-voice-hud.off { color: rgba(36, 22, 67, 0.5); }
+.btn-voice-hud.off .vh-switch { background: #cfc8e0; }
+.btn-voice-hud.off .vh-switch::after { left: -1px; }
 .btn-voice-hud:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
-body.portrait .btn-voice-hud { width: 80px; height: 80px; right: 124px; }
-body.portrait .btn-voice-hud svg { width: 42px; height: 42px; }
+body.portrait .btn-voice-hud { height: 80px; right: 124px; padding: 0 18px; gap: 10px; font-size: 24px; }
+body.portrait .btn-voice-hud svg { width: 34px; height: 28px; }
+body.portrait .btn-voice-hud .vh-switch { width: 52px; height: 28px; }
+body.portrait .btn-voice-hud .vh-switch::after { width: 16px; height: 16px; left: 24px; }
+body.portrait .btn-voice-hud.off .vh-switch::after { left: -1px; }
