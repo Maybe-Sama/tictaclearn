@@ -298,6 +298,9 @@ kbd {
   position: absolute;
   left: 0;
   top: 0;
+  /* Same reason as .token: an absolute box with no width collapses to
+     min-content, which with wrapping turns long names into one letter per line. */
+  width: max-content;
   padding: 10px 30px 14px;
   border: 6px solid var(--ink);
   border-radius: 20px;
@@ -497,12 +500,16 @@ body[data-section='FinalGroove'] .pad { background: var(--pink); }
   position: absolute;
   left: 0;
   top: 0;
+  /* Without a width the absolute box collapses to min-content and long single
+     words (ALEMANIA, PORTUGAL) eat the right-hand padding. */
+  width: max-content;
   will-change: transform, opacity;
 }
 .tk {
   position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   padding: 12px 26px 14px;
   max-width: 250px;
