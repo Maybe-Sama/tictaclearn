@@ -198,37 +198,15 @@ kbd {
 .score-pill { font-size: 22px; padding: 4px 18px 6px; opacity: 0.9; }
 
 /* ------------------------------------------------------------ halo & flag */
-.halo {
-  position: absolute;
-  left: var(--flag-x);
-  top: var(--flag-y);
-  pointer-events: none;
-}
-.halo i {
+.halo-canvas {
   position: absolute;
   left: 0;
   top: 0;
-  border-radius: 50%;
-  border: 26px solid var(--ring);
-  transform: translate(-50%, -50%);
-  transition: opacity 0.3s;
-}
-.halo i:nth-child(1) { width: 470px; height: 470px; --k: 0.05; background: rgba(255, 255, 255, 0.28); border-color: rgba(255, 255, 255, 0.45); }
-.halo i:nth-child(2) { width: 720px; height: 720px; --k: 0.035; }
-.halo i:nth-child(3) { width: 1000px; height: 1000px; --k: 0.025; }
-.halo i:nth-child(4) { width: 1320px; height: 1320px; --k: 0.018; }
-.game.hush .halo i { opacity: 0.25; }
-.game.hush::after {
-  content: '';
-  position: absolute;
-  inset: -300px;
-  background: radial-gradient(circle at 35% 50%, transparent 30%, rgba(36, 22, 67, 0.35));
+  width: var(--sw);
+  height: var(--sh);
+  z-index: 0;
   pointer-events: none;
-  z-index: 1;
 }
-.game.fever .halo i:nth-child(2) { border-color: rgba(255, 93, 143, 0.4); }
-.game.fever .halo i:nth-child(3) { border-color: rgba(255, 210, 63, 0.4); }
-.game.fever .halo i:nth-child(4) { border-color: rgba(22, 194, 163, 0.4); }
 
 .flag-stage {
   position: absolute;
@@ -488,6 +466,12 @@ kbd {
   background: rgba(36, 22, 67, 0.2);
   transform: translate(-50%, -50%);
 }
+.pad i {
+  position: absolute;
+  inset: 14px;
+  border-radius: 50%;
+  border: 6px dashed rgba(36, 22, 67, 0.4);
+}
 .pad {
   position: absolute;
   top: var(--lane-y);
@@ -499,13 +483,6 @@ kbd {
   background: var(--sun);
   transform: translate(-50%, -50%);
   box-shadow: 0 10px 0 var(--ink);
-}
-.pad i {
-  position: absolute;
-  inset: 14px;
-  border-radius: 50%;
-  border: 6px dashed rgba(36, 22, 67, 0.4);
-  transform: none;
 }
 body[data-section='FinalGroove'] .pad { background: var(--pink); }
 
@@ -941,8 +918,7 @@ body[data-section='FinalGroove'] .banner.title::before { background: repeating-l
 /* ------------------------------------------------------------ reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .blob, .spark, .l, .mf, .btn-play, .btn-again, .l.globe svg, .rs-flag.big .rs-flag-art { animation: none; }
-  .dj-body, .flag-stage, .halo i, .pad i, .dot { transform: none; }
-  .halo i { transform: translate(-50%, -50%); }
+  .dj-body, .flag-stage { transform: none; }
   .dot { transform: translate(-50%, -50%); }
   .dj.groovy .dj-body, .dj.groovy.sway-left .dj-body { rotate: 0deg; }
 }
@@ -1250,7 +1226,6 @@ body.portrait .flag-card { width: 420px; }
 body.portrait .flag-group.teach .flag-card { width: 460px; }
 body.portrait .flag-group.n2 .flag-card { width: 300px; }
 body.portrait .label-anchor { top: calc(var(--flag-y) + 200px); }
-body.portrait .halo i:nth-child(1) { width: 560px; height: 560px; }
 body.portrait .l { font-size: 178px; }
 body.portrait .l.globe { width: 156px; height: 156px; }
 body.portrait .subtitle { font-size: 44px; }
@@ -1636,7 +1611,7 @@ body.portrait .sheet-row .btn-voice, body.portrait .sheet-row .btn-calibrate { f
 
 /* ============================================================ v8: mobile paint budget */
 /* Things that move every frame get their own GPU layer: moved, not repainted. */
-.halo i, .token, .flag-slot, .flag-group, .flag-stage, .dj-body, .dj-shadow, .stamp, .pad, .pad i, .dot, .keycap, .fever-badge { will-change: transform; }
+.token, .stamp, .dj-body, .flag-stage, .section-pill .note, .fever-badge, .dot, .pad i { will-change: transform; }
 .flag-slot { perspective: none; }
 /* FEVER background: static (it used to repaint the whole screen every frame). */
 .dj.fever .dj-body { filter: none; }

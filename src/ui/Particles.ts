@@ -32,7 +32,7 @@ export class Particles {
   }
 
   resize(scale: number): void {
-    const k = Math.min(2, window.devicePixelRatio || 1) * scale;
+    const k = Math.min(1.5, window.devicePixelRatio || 1) * scale;
     this.canvas.width = Math.round(L.w * k);
     this.canvas.height = Math.round(L.h * k);
     this.c.setTransform(k, 0, 0, k, 0, 0);

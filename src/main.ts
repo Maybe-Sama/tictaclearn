@@ -46,6 +46,7 @@ function fit(): void {
   const s = Math.min(window.innerWidth / lay.w, window.innerHeight / lay.h);
   stageEl.style.setProperty('--scale', String(s));
   fx.resize(s);
+  stage.resize(s);
 }
 window.addEventListener('resize', fit);
 window.addEventListener('orientationchange', () => window.setTimeout(fit, 150));

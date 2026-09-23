@@ -85,6 +85,9 @@ export class Stage {
   private moodTimer = 0;
   private lastBeat = -1;
   private hush = false;
+  private halo: HTMLCanvasElement;
+  private haloCtx: CanvasRenderingContext2D;
+  private ringColor = 'rgba(255,255,255,0.28)';
   private feverAt = 30;
 
   constructor(
@@ -96,7 +99,7 @@ export class Stage {
     this.root = document.createElement('div');
     this.root.className = 'game screen hidden';
     this.root.innerHTML = `
-      <div class="halo" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <canvas class="halo-canvas" aria-hidden="true"></canvas>
       <div class="hud">
         <div class="pill section-pill"><span class="note">♪</span><span class="section-name"></span></div>
         <div class="pill score-pill"><span class="score-num">0</span></div>
@@ -143,6 +146,8 @@ export class Stage {
     this.dj = q('.dj');
     this.sectionName = q('.section-name');
     this.scoreNum = q('.score-num');
+    this.halo = q('.halo-canvas');
+    this.haloCtx = this.halo.getContext('2d')!;
     q<HTMLButtonElement>('.btn-voice-hud').addEventListener('click', (e) => {
       e.stopPropagation();
       (e.currentTarget as HTMLButtonElement).blur();
@@ -173,13 +178,56 @@ export class Stage {
     this.setCombo(0, true);
     this.setScore(0);
     this.fx.clear();
-    this.root.classList.remove('hush', 'fever-mode');
+    this.root.classList.remove('fever-mode');
     document.body.classList.remove('fever-mode');
     this.hush = false;
   }
 
+  /** Canvas rings instead of four huge composited DOM circles (phones ran out of GPU memory). */
+  resize(scale: number): void {
+    const k = Math.min(1.5, window.devicePixelRatio || 1) * scale;
+    this.halo.width = Math.round(L.w * k);
+    this.halo.height = Math.round(L.h * k);
+    this.haloCtx.setTransform(k, 0, 0, k, 0, 0);
+  }
+
+  private drawHalo(pulse: number): void {
+    const c = this.haloCtx;
+    c.clearRect(0, 0, L.w, L.h);
+    const alpha = this.hush ? 0.25 : 1;
+    if (this.hush) {
+      // The band stops: the stage goes dark. Painted here, so no extra layer.
+      const g = c.createRadialGradient(L.flagX, L.flagY, L.w * 0.2, L.flagX, L.flagY, L.w * 1.1);
+      g.addColorStop(0, 'rgba(36, 22, 67, 0)');
+      g.addColorStop(1, 'rgba(36, 22, 67, 0.45)');
+      c.fillStyle = g;
+      c.fillRect(0, 0, L.w, L.h);
+    }
+    c.save();
+    c.translate(L.flagX, L.flagY);
+    const rings: [number, number, number][] = [
+      [235, 26, 0.05],
+      [360, 26, 0.035],
+      [500, 26, 0.025],
+      [660, 26, 0.018],
+    ];
+    c.fillStyle = `rgba(255, 255, 255, ${0.28 * alpha})`;
+    c.beginPath();
+    c.arc(0, 0, (235 - 13) * (1 + pulse * 0.05), 0, Math.PI * 2);
+    c.fill();
+    rings.forEach(([r, w, k], i) => {
+      c.beginPath();
+      c.arc(0, 0, r * (1 + pulse * k), 0, Math.PI * 2);
+      c.lineWidth = w;
+      c.strokeStyle = i === 0 ? `rgba(255, 255, 255, ${0.45 * alpha})` : this.ringColor.replace(/[\d.]+\)$/, (m) => `${parseFloat(m) * alpha})`);
+      c.stroke();
+    });
+    c.restore();
+  }
+
   setSection(state: GameState): void {
     this.root.dataset.section = state;
+    this.ringColor = getComputedStyle(this.root).getPropertyValue('--ring').trim() || this.ringColor;
     const name = SECTION_NAMES[state];
     if (name) {
       this.sectionName.textContent = name;
@@ -200,12 +248,10 @@ export class Stage {
       const q = (sel: string) => [...this.root.querySelectorAll<HTMLElement>(sel)];
       const kick = (base: string, peak: string): Keyframe[] => [{ transform: `${base} ${peak}` }, { transform: `${base}` }];
       this.pulseEls = [
-        ...q('.halo i').map((el, i) => ({ el, frames: kick('translate(-50%, -50%)', `scale(${[1.05, 1.035, 1.025, 1.018][i]})`) })),
         ...q('.dot').map((el) => ({ el, frames: kick('translate(-50%, -50%)', 'scale(1.5)') })),
         { el: q('.pad i')[0], frames: kick('', 'scale(1.1) rotate(20deg)') },
         { el: q('.flag-stage')[0], frames: kick('', 'translateY(-6px)') },
         { el: q('.dj-body')[0], frames: kick('', 'translateY(-16px) scale(1.05, .95)') },
-        { el: q('.dj-shadow')[0], frames: kick('translateX(-50%)', 'scale(.85)') },
         { el: q('.section-pill .note')[0], frames: kick('', 'scale(1.25)') },
         { el: q('.fever-badge')[0], frames: kick('translate(-50%, -50%) rotate(-4deg)', 'scale(1.12)') },
       ].filter((x) => x.el);
@@ -233,6 +279,7 @@ export class Stage {
 
   render(now: number, engine: RhythmEngine): void {
     const info = engine.beatInfo(now);
+    this.drawHalo(info && !this.reduced ? Math.exp(-(info.beat - Math.floor(info.beat)) * 5) : 0);
     if (info) {
       const gb = Math.floor(info.globalBeat + 1e-6);
       if (gb !== this.lastBeat) {
@@ -242,7 +289,7 @@ export class Stage {
       const hush = !!info.sp.phrase.dropBeats?.includes(Math.floor(info.beat));
       if (hush !== this.hush) {
         this.hush = hush;
-        this.root.classList.toggle('hush', hush);
+
       }
     }
 
