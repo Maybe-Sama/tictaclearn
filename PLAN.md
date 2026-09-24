@@ -1,130 +1,279 @@
-# WORLD BEAT · de prototipo a juego viral
+# WORLD BEAT · Plan revisado (Design & Architecture Review)
 
-Documento de trabajo. Estado a 25/09/2026: prototipo jugable en web con dos asignaturas
-(banderas, capitales), 195 países, Beat Tour (7 zonas, 60 conciertos), Beat Libre,
-4 dificultades, motor de ritmo propio y música procedural.
+Revisión del plan anterior aplicando criterio de dirección de juego. Estado real del
+prototipo a 25/09/2026, medido sobre el código, no sobre intenciones:
+
+- Motor de ritmo con el `AudioContext` como reloj, planificación con lookahead y
+  compensación de latencia de salida. **Funciona y está medido** (tambores a 0 ms del
+  beat, 0 notas tardías con CPU ×6).
+- 195 países, 2 asignaturas, Beat Tour (7 zonas / 60 conciertos), Beat Libre,
+  4 dificultades, repaso espaciado persistente, 6 bandas × 8 progresiones × 7 tonos.
+- `Game.ts` 886 líneas, `Stage.ts` 737 líneas. Sin tests en el repositorio.
+  `Math.random` en 8 archivos, sin semilla. El tutorial y el Beat 2 (gemelas/trampas)
+  solo son alcanzables con la tecla de depuración: **contenido huérfano**.
 
 ---
 
-## 1. La apuesta en una frase
+## 1. Diagnóstico
 
-> **El primer juego de trivia que se juega con las manos al ritmo, no con el ratón.**
-> Los vídeos de "adivina la bandera" ya funcionan. Lo que no existe es uno donde el
-> streamer **falle en directo por medio compás** y el chat lo vea venir.
+### Lo que está bien y NO se toca
+- **El reloj y el juicio de timing.** Es el corazón y está resuelto con criterio:
+  reloj de audio, lookahead, `heardTime`, ventanas por dificultad, distinción entre
+  fallo de conocimiento y fallo de ritmo. Tocarlo ahora sería destruir valor.
+- **La separación motor / contenido.** `ContentPack` + `LearningItem` ya permite una
+  asignatura nueva sin tocar el motor. Lo hemos probado dos veces (banderas, capitales).
+- **El Tour generado por datos.** 60 conciertos salen de una lista de países y una
+  función de rampa. Añadir "monumentos" son datos, no código.
+- **La honestidad pedagógica.** Aprobar por conocimiento y no por ritmo es la decisión
+  de diseño más importante del proyecto. Se queda.
 
-Dos públicos, un mismo juego:
+### Lo que está mal
+- **El plan anterior era un plan de marketing disfrazado de plan de producto.** Ponía
+  el reto diario y lo compartible en la fase 1, cuando el problema real es que **60
+  conciertos son la misma mecánica cambiando la bandera**. Si traemos tráfico a un
+  juego que aburre al tercer nivel, quemamos la única primera impresión que tenemos.
+- **Una sola primitiva de gameplay.** Todo el juego es TAP. Rhythm Heaven no es genial
+  por tener buen timing: es genial porque cada minijuego tiene un *verbo* distinto.
+- **El criterio de aprobado no mide lo que dice medir.** Cuenta todos los intentos,
+  incluidos los de repaso, así que se puede superar un concierto sin aprender ninguno
+  de los países nuevos que ese concierto enseña.
+- **Nada es determinista.** Sin semilla no hay reto diario justo, ni repeticiones, ni
+  duelos, ni reproducir un bug. Es la dependencia oculta de media hoja de ruta.
+- **Sin red de seguridad.** Los scripts con los que he verificado ritmo, rendimiento y
+  desbordes viven en una carpeta temporal fuera del repositorio. Una regresión de
+  timing es invisible a ojo y ahora mismo nada la detiene.
 
-| | Estudiante | Streamer / espectador |
+### Lo que falta
+- Arquetipos de concierto (variedad percibida), identidad sonora propia, tutorial
+  reincorporado al flujo real, exportar/importar progreso, inglés.
+
+### Lo que sobra
+- El duelo local a dos manos tal y como lo planteé, el ranking global en fase 3 (sin
+  validación es folclore), y cualquier sistema de cuentas.
+
+---
+
+## 2. Riesgos
+
+| | Riesgo | Detalle |
 |---|---|---|
-| Quiere | Aprobar geografía sin aburrirse | Contenido con tensión, fallos y risas |
-| Sesión | 3–10 min diarios | 20–40 min, o un reto de 60 s |
-| Éxito | "Me las sé" | "Qué vergüenza, he fallado Bélgica" |
-| Lo que le retiene | Progreso visible, repaso que funciona | Rachas, público, ranking, picarse |
-
-La clave: **el ritmo convierte saber en espectáculo**. Un quiz normal no tiene momento
-de tensión; aquí cada respuesta tiene un instante exacto, y fallar por tiempo es
-gracioso y compartible.
-
----
-
-## 2. Qué falta para que sea "jugable por un streamer" (lo mínimo)
-
-Por orden de impacto sobre esfuerzo:
-
-1. **Reto diario con semilla compartida.** Mismos países, mismo orden, misma canción
-   para todo el mundo ese día. 60–90 segundos. Un botón de compartir con resultado en
-   texto (cuadraditos tipo Wordle: 🟩🟩🟨⬛). Es *el* mecanismo de difusión gratuito.
-2. **Tarjeta de resultado bonita** (imagen PNG generada en el propio navegador) lista
-   para Twitter/Instagram: puntuación, combo máximo, las banderas falladas.
-3. **Modo duelo local (2 jugadores, mismo teclado)**: uno con A, otro con L. Es lo que
-   mejor funciona en vídeo, y no necesita servidor.
-4. **Modo espectador / overlay**: fondo transparente, HUD compacto en un lado,
-   preparado para OBS. Y un modo "sin música" para que el streamer ponga la suya.
-5. **Repetición de los 10 últimos segundos** (clip) al fallar algo sonado. Sin vídeo:
-   se puede reproducir la secuencia dentro del juego, que es igual de gracioso.
+| 🔴 | **Repetición del core loop** | 60 conciertos con la misma estructura: título → enseñar → 4 retos → mezcla → final. Es el riesgo número uno del proyecto y el plan anterior no lo atacaba |
+| 🔴 | **No determinismo** | `Math.random` sin semilla en generador, setlist, música y partículas. Bloquea reto diario, duelos, repeticiones y depuración de bugs reportados |
+| 🔴 | **Sin pruebas automáticas en el repo** | El timing se rompe en silencio. Ya me ha pasado una vez en este proyecto (el tempo que se movía) y solo se vio midiendo |
+| 🟠 | **Criterio de aprobado difuso** | Se aprueba un concierto sin dominar sus países nuevos; las estrellas mienten y el repaso espaciado recibe datos sesgados |
+| 🟠 | **Contenido huérfano** | Tutorial y Beat 2 (gemelas/trampas) inalcanzables: ~200 líneas de contenido bueno que nadie ve, y un onboarding inexistente para quien entra por primera vez |
+| 🟠 | **Dos clases-dios** | `Game.ts` (886) mezcla navegación, sesión, calibración, resultados y bot; `Stage.ts` (737) mezcla HUD, carril, lienzo y feedback. Todavía manejable, peligroso al añadir modos |
+| 🟠 | **Latencia en móvil/Bluetooth** | Mitigada (tambores anclados, calibración manual), pero el usuario nuevo no sabe que existe *Ajustar ritmo* |
+| 🟠 | **Ranking sin validación** | Puntuación cliente: trivial de falsear. Un ranking público con premios sería insostenible |
+| 🟡 | **Solo español** | Los strings viven en el código y las respuestas en los datos. Cada semana que pasa es más caro. El público streamer internacional es 10× |
+| 🟡 | **Progreso atado al navegador** | Sin export/import, quien cambia de móvil pierde su gira |
+| 🟡 | **Datos sin validar** | Capitales escritas a mano, sin comprobación de duplicados, señuelos que colisionen o etiquetas demasiado largas |
+| 🟢 | **Timing, audio y motor rítmico** | Medido y correcto. Es el activo del proyecto |
+| 🟢 | **Escalado de contenido** | `ContentPack` aguanta 10× contenido sin rehacer el motor |
 
 ---
 
-## 3. Qué falta para que "de verdad enseñe" (lo que retiene)
+## 3. Decisiones que cambiaría
 
-1. **Repaso diario inteligente**: hoy la memoria por país ya existe (cajas de repaso).
-   Falta la pantalla "hoy toca repasar 12" y un recordatorio.
-2. **Mapa de dominio**: un mapamundi coloreado por lo que sabes. Es la imagen que la
-   gente comparte ("me falta África entera").
-3. **Más asignaturas con el mismo motor**: siluetas de países, idiomas (palabra →
-   traducción), símbolos químicos, operaciones, obras de arte. Cada una es un archivo
-   de contenido; el motor de ritmo no se toca.
-4. **Modo profesor**: crear un set de países y compartirlo con un código de 6 letras.
-   Sin cuentas: el código lleva la lista comprimida en la URL.
+### 3.1 Primero variedad, después difusión
+- **ACTUAL:** Fase 1 = reto diario y compartir.
+- **PROBLEMA:** Atraemos gente a un juego que se agota en 10 minutos. La retención no
+  se arregla con tráfico.
+- **PROPUESTA:** Fase 1 = primitivas nuevas y arquetipos de concierto. La difusión pasa
+  a la fase 3, cuando haya algo que merezca compartirse.
+- **POR QUÉ:** Un juego con un buen primer día y mal segundo día no se vuelve viral; se
+  vuelve un vídeo y ya está.
+- **COSTE/BENEFICIO:** Retrasa la difusión 3–4 semanas. Es la diferencia entre un pico
+  y un producto.
+
+### 3.2 Añadir dos primitivas, no diez
+- **ACTUAL:** Solo TAP (tambores + país correcto).
+- **PROBLEMA:** Toda la variedad recae en la música y en la plantilla rítmica. El
+  jugador percibe siempre el mismo verbo.
+- **PROPUESTA:** Añadir exactamente dos:
+  1. **HOLD** — mantener pulsado mientras una ficha larga cruza el pad (el país "se
+     estira": banderas con nombre largo, capitales con varias palabras). Un solo botón
+     sigue bastando; en móvil es mantener el dedo.
+  2. **ECHO (llamada y respuesta)** — la banda toca un patrón de 4 tiempos y tú lo
+     repites. Es puro ritmo, sin conocimiento, y sirve como respiro entre tandas y como
+     tutorial natural del compás.
+- **POR QUÉ:** Con TAP + HOLD + ECHO y la capa de conocimiento (MATCH) se construyen
+  decenas de retos distintos sin motor nuevo.
+- **COSTE/BENEFICIO:** ~1 semana de motor (el juez ya distingue tipos de ficha).
+  Multiplica la variedad percibida.
+
+### 3.3 Arquetipos de concierto en vez de una plantilla única
+- **ACTUAL:** Todos los conciertos comparten estructura.
+- **PROPUESTA:** 6 arquetipos que combinan las mismas piezas con fantasía distinta:
+  **Escuela** (enseñar + practicar, el actual), **Sprint** (sin enseñar, densidad alta,
+  60 s), **Eco** (mitad ritmo puro), **Memoria** (bandera en flash, responde después),
+  **Desfile** (flujo continuo, una bandera por compás), **Jefe** (dobles, a ciegas y
+  cambios de tempo entre secciones). El Tour asigna arquetipo por posición y zona.
+- **POR QUÉ:** Variedad perceptiva reutilizando sistemas: exactamente lo que pide un
+  buen rhythm game.
+- **COSTE/BENEFICIO:** ~1 semana. Es el mayor salto de calidad percibida por euro.
+
+### 3.4 Semilla determinista antes que cualquier función social
+- **ACTUAL:** `Math.random` disperso.
+- **PROPUESTA:** Un módulo `Rng` (mulberry32 o similar) inyectado en generador de
+  retos, setlist y música. La partida queda definida por `(semilla, asignatura, plan)`.
+  La dificultad adaptativa se **congela** en modos con semilla, o dos jugadores con la
+  misma semilla no jugarían lo mismo.
+- **POR QUÉ:** Es requisito de reto diario, duelos, repeticiones y reproducción de bugs.
+- **COSTE/BENEFICIO:** 1–2 días ahora. Semanas si se hace después, con tres funciones ya
+  construidas encima.
+
+### 3.5 Aprobar por lo que enseña el concierto
+- **ACTUAL:** Aciertos sobre todos los intentos (nuevos + repaso).
+- **PROPUESTA:** Aprobado = ≥ 70 % sobre los **países nuevos** del concierto; el repaso
+  aporta a la 2.ª estrella; el ritmo, a la 3.ª.
+- **POR QUÉ:** Las estrellas deben significar algo y el repaso espaciado necesita datos
+  limpios.
+- **COSTE/BENEFICIO:** Media hora de código. Corrige una mentira del sistema.
+
+### 3.6 El tutorial vuelve al juego
+- **ACTUAL:** Inalcanzable salvo con teclas de depuración.
+- **PROPUESTA:** La primera vez que alguien entra a cualquier concierto, se antepone un
+  **primer compás guiado** (los tambores y una demostración). Se borran los guiones
+  Beat 1 / Beat 2; sus ideas buenas (gemelas, trampas) ya viven en la Gira Mundial.
+- **POR QUÉ:** Menos código muerto, y nadie empieza sin saber qué hacer.
+- **COSTE/BENEFICIO:** ~1 día y elimina ~200 líneas.
+
+### 3.7 El duelo, por turnos, no a dos manos
+- **ACTUAL:** Dos jugadores en el mismo teclado sobre un único carril.
+- **PROBLEMA:** Dos personas pulsando sobre la misma línea temporal es ilegible, y en
+  móvil directamente imposible.
+- **PROPUESTA:** **Relevo**: turnos de 30 s con la misma semilla, se pasa el teléfono, y
+  al final una comparación lado a lado. Cero servidor, funciona en directo y en el sofá.
+- **COSTE/BENEFICIO:** Más barato y más divertido que la propuesta anterior.
+
+### 3.8 Ranking sí, pero honesto
+- **ACTUAL:** Ranking semanal en fase 3.
+- **PROPUESTA:** Fase 3 = ranking **entre amigos por enlace** (sin servidor de verdad).
+  Ranking global solo cuando el servidor pueda **revalidar la partida** a partir de la
+  semilla y la lista de pulsaciones.
+- **POR QUÉ:** Un marcador falseable destruye la confianza en cuanto alguien lo publica.
 
 ---
 
-## 4. Riesgos reales (y qué hacer con ellos)
+## 4. Plan revisado
 
-| Riesgo | Por qué importa | Mitigación |
-|---|---|---|
-| **Latencia en móvil** | Si los golpes no cuadran, el juego muere | Ya hay calibración y tambores anclados al beat. Falta: calibración automática silenciosa |
-| **La curva se hace repetitiva** | 60 conciertos con la misma estructura cansan | Ya hay 6 bandas y 8 progresiones. Falta: más plantillas rítmicas y "mundos" con reglas propias |
-| **Sin cuentas, sin progreso entre dispositivos** | Frustra al que juega en móvil y PC | Código de respaldo exportable; cuentas solo cuando haya demanda |
-| **Derechos musicales** | Cero problema hoy (todo sintetizado) | Mantener la música procedural como principio |
-| **Banderas y política** | Kosovo, Taiwán, Palestina, capitales en disputa | Lista ONU + observadores, y los casos discutidos fuera de Capitales. Documentado |
-| **Un clon con más presupuesto** | La idea es copiable | La ventaja es el motor de ritmo afinado y el contenido; correr rápido y construir comunidad |
+### Fase 0 — Cimientos invisibles (3–5 días)
+1. Módulo `Rng` con semilla, inyectado en generador, setlist y música. Congelar la
+   dificultad adaptativa en modos con semilla.
+2. Mover el arnés de pruebas al repositorio (`tools/e2e`) y añadirlo a la CI:
+   ritmo en el beat, 0 notas tardías con CPU ×4, 0 textos desbordados, recorrido de
+   menús completo, presupuesto de fotogramas.
+3. Validador de contenido en la CI: ids únicos, bandera existente, señuelo que no sea
+   capital de otro país, longitudes de etiqueta razonables.
 
----
+### Fase 1 — Que el juego sea variado (2 semanas)
+4. Primitiva **HOLD** (motor, juez, ficha larga, sonido sostenido).
+5. Primitiva **ECHO** (llamada y respuesta).
+6. Los 6 **arquetipos de concierto** y su reparto por el Tour.
+7. Ajuste de la curva con jugadores reales, no bots.
 
-## 5. Hoja de ruta
+### Fase 2 — Que enseñe de verdad (1 semana)
+8. Aprobado por países nuevos; estrellas coherentes.
+9. **Primer compás guiado** para novatos; borrar Beat 1 / Beat 2.
+10. Pantalla **"Hoy toca repasar"** con lo que el sistema de cajas ya sabe.
+11. Autocalibración silenciosa: si la mediana de desvío supera ~35 ms, ofrecer ajustar.
 
-### Fase 1 — "Que enganche" (2–3 semanas)
-- Reto diario con semilla + resultado compartible (texto y PNG).
-- Tarjeta de resultados rediseñada para captura.
-- Racha diaria ("llevas 5 días").
-- Ajuste fino de la curva de los 60 conciertos con jugadores reales (no bots).
-- **Métrica objetivo:** que 3 de cada 10 que empiezan una partida jueguen una segunda.
+### Fase 3 — Que se comparta (2 semanas)
+12. **Reto diario** con semilla del día (mismos países, mismo orden, misma canción).
+13. **Resultado compartible**: cuadraditos por ronda + enlace con la semilla.
+14. **Tarjeta de resultado** en imagen generada en el navegador.
+15. Racha diaria y "juega la partida de tu amigo" (misma semilla desde el enlace).
 
-### Fase 2 — "Que se comparta" (3–4 semanas)
-- Duelo local a dos manos.
-- Modo overlay para OBS + modo sin música.
-- Mapa de dominio compartible.
-- Sets por código para clase.
-- **Métrica objetivo:** 1 de cada 10 partidas termina en un resultado compartido.
+### Fase 4 — Identidad (2 semanas)
+16. Identidad sonora: logotipo sonoro, voz del planeta, sonidos reconocibles.
+17. Mascota con personalidad real (reacciona, se burla, celebra), transiciones propias.
+18. **Mapa de dominio** compartible.
+19. Accesibilidad: daltonismo, tipografía alternativa, modo de movimiento reducido ya
+    existente revisado.
 
-### Fase 3 — "Que crezca" (4–6 semanas)
-- Ranking semanal del reto diario (requiere backend mínimo).
-- Duelo en línea asíncrono: juegas la partida de otro y comparas.
-- 2 asignaturas nuevas (siluetas de países, banderas de comunidades/estados).
-- App instalable (PWA) y sonido con latencia baja.
-- **Métrica objetivo:** 1.000 jugadores en el reto diario.
+### Fase 5 — Social y aula (2 semanas)
+20. **Relevo** (duelo por turnos con semilla).
+21. Modo **overlay/OBS**: HUD compacto, fondo transparente, opción sin música.
+22. Sets por **código** (lista comprimida en la URL, sin servidor).
+23. Exportar/importar progreso.
 
-### Fase 4 — "Que se sostenga"
-- Versión escolar: panel de profesor, seguimiento de alumnos, sets propios.
-- Patrocinio de packs temáticos (mundiales, Eurovisión, JJOO).
-- Cosmético: bandas y escenarios desbloqueables. Nunca vender ventaja de juego.
-
----
-
-## 6. Cómo se gana dinero (sin romper el juego)
-
-1. **Gratis siempre el juego base.** Es el motor de difusión.
-2. **Packs cosméticos**: bandas musicales, escenarios, mascotas. 2–4 €.
-3. **Licencia de centro**: panel de profesor, informes, sets propios. 1–3 €/alumno/año.
-4. **Patrocinios temáticos** en fechas señaladas.
-5. **Nada de anuncios que interrumpan el ritmo.** Un anuncio a mitad de compás mata el juego.
+### Fase 6 — Escala (cuando haya retención demostrada)
+24. Inglés (extraer strings + respuestas por idioma).
+25. PWA instalable.
+26. Servidor mínimo: guardar partidas del reto diario con validación por repetición.
+27. Ranking global y liga semanal.
 
 ---
 
-## 7. Lanzamiento
+## 5. Definition of Done por fase
 
-1. **Semilla**: 20–30 personas reales (clase, amigos, familia) durante una semana.
-2. **Creadores**: buscar 10 canales medianos de trivia/geografía en español. Darles
-   enlace directo a un reto preparado para ellos (su nombre en el reto del día).
-3. **Momento**: un reto diario temático que coincida con algo (Eurovisión, un mundial).
-4. **Comunidad**: Discord o grupo donde se comparta el resultado del día.
+**Fase 0**
+- `npm run verify` ejecuta en CI y falla si: algún tambor suena a más de 1 ms de su
+  beat; hay una sola nota tardía con CPU ×4; algún texto desborda su caja; el recorrido
+  inicio → asignatura → zona → concierto → resultados no llega al final.
+- Dos ejecuciones con la misma semilla producen **la misma secuencia de retos y la misma
+  canción** (comparación de una traza serializada).
+
+**Fase 1**
+- Un concierto de cada arquetipo se completa sin errores en móvil y escritorio.
+- En una sesión de 10 minutos, el jugador ve al menos 3 arquetipos distintos.
+- 8 de cada 10 jugadores de prueba describen correctamente qué hace HOLD sin que nadie
+  se lo explique.
+
+**Fase 2**
+- Un jugador que falla todos los países nuevos **no** supera el concierto (prueba
+  automática con el bot en modo "wrong").
+- 7 de cada 10 novatos superan su primer concierto sin ayuda externa.
+
+**Fase 3**
+- Dos dispositivos distintos, mismo día: misma secuencia y misma canción.
+- El texto compartido reproduce la partida al abrir el enlace.
+- Métrica: ≥ 25 % de quienes terminan el reto diario pulsan compartir.
+
+**Fase 4**
+- Prueba a ciegas: 7 de cada 10 personas reconocen el juego solo por el sonido de acierto.
+
+**Fase 5**
+- Una partida de Relevo completa entre dos personas en un solo teléfono, sin recargar.
+- El overlay ocupa < 25 % de la pantalla y es legible a 720p.
+
+**Fase 6**
+- Una partida del reto diario se revalida en el servidor a partir de semilla +
+  pulsaciones, y una puntuación manipulada se rechaza.
 
 ---
 
-## 8. Lo que NO hay que hacer
+## 6. Lo que NO construyo todavía
 
-- No meter cuentas obligatorias antes de tener retención.
-- No añadir más asignaturas antes de que una esté realmente pulida.
-- No sacrificar la precisión del ritmo por un efecto visual.
-- No convertirlo en un quiz con música (la regla de oro del primer día sigue vigente).
+- Cuentas de usuario y login.
+- Ranking global (hasta que haya validación por repetición).
+- Multijugador en tiempo real.
+- Editor de niveles.
+- Asignaturas nuevas (idiomas, monumentos, química): primero dos pulidas.
+- Tienda, cosméticos y cualquier monetización.
+- App nativa.
+- Backend propio más allá del mínimo de la fase 6.
+- Sistema de logros.
+
+---
+
+## 7. Veredicto técnico
+
+**Intacto:** reloj de audio y `heardTime`, juez y ventanas, planificador con lookahead,
+música procedural y bandas, `ContentPack`, generación del Tour por datos, repaso
+espaciado persistente.
+
+**Refactorizar (moderado, sin reescribir):**
+- `Game.ts` → separar `SessionController` (una partida), `FlowController` (navegación)
+  y `CalibrationController`. Se hace cuando entren los arquetipos, no antes.
+- `Stage.ts` → extraer el carril (`Lane`) y el HUD; el resto se queda.
+- `LearningItem.flagAsset` → `asset` antes de la tercera asignatura.
+
+**Eliminar:** guiones Beat 1 / Beat 2 del setlist (contenido huérfano) y las rutas de
+depuración asociadas.
+
+**Decidir antes de implementar:**
+1. ¿HOLD también en móvil con dedo mantenido, o solo teclado? (Afecta a la ficha larga.)
+2. ¿El reto diario es de una asignatura fija por día o mezcla banderas y capitales?
+3. ¿Inglés en la fase 6 o antes? Si el objetivo es streamers, quizá antes.
