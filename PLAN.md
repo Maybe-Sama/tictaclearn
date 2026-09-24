@@ -173,17 +173,29 @@ prototipo a 25/09/2026, medido sobre el código, no sobre intenciones:
 6. Los 6 **arquetipos de concierto** y su reparto por el Tour.
 7. Ajuste de la curva con jugadores reales, no bots.
 
-### Fase 2 — Que enseñe de verdad (1 semana)
+### Fase 2 — Que enseñe de verdad + inglés (2 semanas)
 8. Aprobado por países nuevos; estrellas coherentes.
 9. **Primer compás guiado** para novatos; borrar Beat 1 / Beat 2.
 10. Pantalla **"Hoy toca repasar"** con lo que el sistema de cajas ya sabe.
 11. Autocalibración silenciosa: si la mediana de desvío supera ~35 ms, ofrecer ajustar.
+12. **Inglés** (decisión del director, subido desde la fase 6): extraer los textos a un
+    módulo de idioma y las respuestas por idioma en el contenido. Se hace aquí porque
+    ya estamos tocando el flujo de enseñanza, y porque el público de creadores en inglés
+    es ~10× el hispanohablante. Cada semana de retraso lo encarece.
 
 ### Fase 3 — Que se comparta (2 semanas)
-12. **Reto diario** con semilla del día (mismos países, mismo orden, misma canción).
-13. **Resultado compartible**: cuadraditos por ronda + enlace con la semilla.
-14. **Tarjeta de resultado** en imagen generada en el navegador.
-15. Racha diaria y "juega la partida de tu amigo" (misma semilla desde el enlace).
+13. **Reto diario**: 10 banderas, ~60 s, mismo reto para todos. Especificación completa
+    en [docs/DAILY-AND-SHARE.md](docs/DAILY-AND-SHARE.md). Decisiones del director:
+    asignatura **siempre Banderas**; dificultad adaptativa **congelada**; el historial de
+    confusiones del jugador **no** interviene (rompería la igualdad entre jugadores);
+    el número de reto se deriva de la **fecha local** (modelo Wordle: mismo número =
+    mismo reto para todos, sin cambios a la 01:00 de la madrugada).
+14. **Resultado compartible en texto** (variante B: cuadrícula + la línea del fallo
+    estrella, que es lo único que habla de la persona) + enlace corto sin resultado.
+15. "Juega la partida de tu amigo" desde el enlace.
+16. *Condicionadas, no se construyen de entrada:* la **tarjeta en imagen** solo si el
+    texto supera el 6 % de compartidos; la **racha** solo si entra con el código de
+    progreso exportable.
 
 ### Fase 4 — Identidad (2 semanas)
 16. Identidad sonora: logotipo sonoro, voz del planeta, sonidos reconocibles.
@@ -195,14 +207,16 @@ prototipo a 25/09/2026, medido sobre el código, no sobre intenciones:
 ### Fase 5 — Social y aula (2 semanas)
 20. **Relevo** (duelo por turnos con semilla).
 21. Modo **overlay/OBS**: HUD compacto, fondo transparente, opción sin música.
+21b. **Modo Chat**: pausa de 2–5 s tras revelar la bandera para que el público del directo
+     responda antes que el streamer. Es la única función que genera contenido sin que
+     nosotros grabemos nada; va por delante de la tarjeta de imagen.
 22. Sets por **código** (lista comprimida en la URL, sin servidor).
 23. Exportar/importar progreso.
 
 ### Fase 6 — Escala (cuando haya retención demostrada)
-24. Inglés (extraer strings + respuestas por idioma).
-25. PWA instalable.
-26. Servidor mínimo: guardar partidas del reto diario con validación por repetición.
-27. Ranking global y liga semanal.
+24. PWA instalable.
+25. Servidor mínimo: guardar partidas del reto diario con validación por repetición.
+26. Ranking global y liga semanal.
 
 ---
 
@@ -229,7 +243,8 @@ prototipo a 25/09/2026, medido sobre el código, no sobre intenciones:
 **Fase 3**
 - Dos dispositivos distintos, mismo día: misma secuencia y misma canción.
 - El texto compartido reproduce la partida al abrir el enlace.
-- Métrica: ≥ 25 % de quienes terminan el reto diario pulsan compartir.
+- Métrica: **6–12 %** de quienes terminan el reto diario pulsan compartir (el ≥ 25 % del
+  plan anterior estaba mal calibrado; no es una referencia honesta).
 
 **Fase 4**
 - Prueba a ciegas: 7 de cada 10 personas reconocen el juego solo por el sonido de acierto.
@@ -275,5 +290,6 @@ depuración asociadas.
 
 **Decidir antes de implementar:**
 1. ¿HOLD también en móvil con dedo mantenido, o solo teclado? (Afecta a la ficha larga.)
-2. ¿El reto diario es de una asignatura fija por día o mezcla banderas y capitales?
-3. ¿Inglés en la fase 6 o antes? Si el objetivo es streamers, quizá antes.
+2. ~~¿Asignatura del reto diario?~~ **Decidido: siempre Banderas.** Es lo que la gente
+   ya consume en vídeo, y mezclar asignaturas rompe la comparación entre jugadores.
+3. ~~¿Inglés en la fase 6?~~ **Decidido: sube a la fase 2.**

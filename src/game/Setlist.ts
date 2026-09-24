@@ -5,6 +5,7 @@ import { OFFBEAT_PATTERNS, TEMPLATES, type ChallengeGenerator, type DrumPattern,
 import type { DifficultyDirector, DifficultySettings, Tier } from './Difficulty';
 import type { ConcertParams } from './Tour';
 import { GameState } from './GameStateMachine';
+import type { Rng } from '../util/rng';
 
 export type { LevelId };
 
@@ -40,8 +41,6 @@ export interface SessionPlan {
   depth: number;
 }
 
-const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-
 /**
  * The session "song": a sequence of short sections, written as generators so
  * each phrase is built just-in-time (a bar ahead) and can react to what the
@@ -61,6 +60,7 @@ export class Setlist implements PhraseSource {
     private cg: ChallengeGenerator,
     private dd: DifficultyDirector,
     private diff: DifficultySettings,
+    private rng: Rng,
     opts: { level: LevelId; skipTutorial: boolean; plan?: SessionPlan },
   ) {
     if (opts.plan) {
@@ -348,14 +348,14 @@ export class Setlist implements PhraseSource {
       if (!breakDone && used >= o.budget * 0.45) {
         breakDone = true;
         used += 8;
-        yield this.cg.drumPhrase(8, pick([[0, 1, 1.5, 2, 3, 4, 4.5, 5, 6, 6.5, 7], [0, 0.5, 1, 2, 2.5, 3, 4, 5, 5.5, 6, 7], [0, 1, 2, 2.5, 3, 3.5, 4, 5, 6, 7]]), {
+        yield this.cg.drumPhrase(8, this.rng.pick([[0, 1, 1.5, 2, 3, 4, 4.5, 5, 6, 6.5, 7], [0, 0.5, 1, 2, 2.5, 3, 4, 5, 5.5, 6, 7], [0, 1, 2, 2.5, 3, 3.5, 4, 5, 6, 7]]), {
           ...base,
           events: [...firstEvents, { type: 'text', beat: 0, text: '¡SOLO DE TAMBOR!', style: 'top', beats: 7.5 }],
         });
         continue;
       }
 
-      if (o.allowQuick && tier >= 1 && n >= 2 && Math.random() < (tier === 2 ? 0.35 : 0.2)) {
+      if (o.allowQuick && tier >= 1 && n >= 2 && this.rng.chance(tier === 2 ? 0.35 : 0.2)) {
         const count = tier === 2 ? 4 : 2;
         for (let k = 0; k < count; k++) {
           yield this.cg.challengePhrase('quick', { ...base, drums: 'basic', ghost: this.ghost(o), events: k === 0 ? [...firstEvents, ...this.announce('quick')] : [] });
@@ -366,21 +366,21 @@ export class Setlist implements PhraseSource {
       }
 
       const choices: TemplateId[] = tier === 0 ? ['four', 'four', 'gap'] : tier === 1 ? ['four', 'gap', 'rapid', 'eight', 'tension'] : ['rapid', 'eight', 'tension', 'gap', ...(o.allowDouble && this.diff.double ? (['double'] as TemplateId[]) : [])];
-      const tid = pick(choices);
-      const drums: DrumPattern = tier === 0 ? pick(['basic', 'pickup']) : tier === 1 ? pick(['pickup', 'sync', 'gallop']) : pick(['sync', 'gallop', 'offbeats']);
-      const flash = !!o.allowFlash && this.diff.flash && tier === 2 && tid !== 'double' && Math.random() < 0.35;
+      const tid = this.rng.pick(choices);
+      const drums: DrumPattern = tier === 0 ? this.rng.pick<DrumPattern>(['basic', 'pickup']) : tier === 1 ? this.rng.pick<DrumPattern>(['pickup', 'sync', 'gallop']) : this.rng.pick<DrumPattern>(['sync', 'gallop', 'offbeats']);
+      const flash = !!o.allowFlash && this.diff.flash && tier === 2 && tid !== 'double' && this.rng.chance(0.35);
       const events: PhraseEvent[] = [...firstEvents];
       if (OFFBEAT_PATTERNS.has(drums)) events.push(...this.announce('offbeat'));
       if (flash) events.push(...this.announce('flash'));
       if (tid === 'double') events.push(...this.announce('double'));
-      yield this.cg.challengePhrase(tid, { ...base, drums: tid === 'double' ? 'triple' : drums, flash, ghost: this.ghost(o), doubleGap: Math.random() < 0.5 ? 1 : 2, events });
+      yield this.cg.challengePhrase(tid, { ...base, drums: tid === 'double' ? 'triple' : drums, flash, ghost: this.ghost(o), doubleGap: this.rng.chance(0.5) ? 1 : 2, events });
       used += TEMPLATES[tid].beats;
       n++;
     }
   }
 
   private ghost(o: AdaptiveOpts): boolean {
-    return !!o.ghostChance && Math.random() < o.ghostChance;
+    return !!o.ghostChance && this.rng.chance(o.ghostChance);
   }
 
   /** Double hit is always demonstrated before it is asked for. */

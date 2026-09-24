@@ -1,5 +1,6 @@
 import type { LearningItem } from '../content/types';
 import { randRange } from '../util/random';
+import type { Rng } from '../util/rng';
 
 export type Outcome = 'clean' | 'hitWithErrors' | 'knowledge' | 'rhythm' | 'noResponse';
 
@@ -60,7 +61,7 @@ export class LearningTracker {
   private map = new Map<string, ItemStats>();
   private timingSum = new Map<string, number>();
 
-  constructor(items: LearningItem[], carry?: LearningTracker) {
+  constructor(items: LearningItem[], private rng: Rng, carry?: LearningTracker) {
     for (const it of items) this.map.set(it.id, fresh(it));
     if (carry) {
       // "Dale otra vuelta" flags from the previous run are due immediately.
@@ -111,7 +112,7 @@ export class LearningTracker {
         else s.goods++;
         if (s.dueAt !== null && now >= s.dueAt) {
           s.pending = Math.max(0, s.pending - 1);
-          s.dueAt = s.pending > 0 ? now + randRange(20, 32) : null;
+          s.dueAt = s.pending > 0 ? now + randRange(20, 32, this.rng) : null;
         }
         break;
       }
@@ -123,14 +124,14 @@ export class LearningTracker {
         if (outcome === 'noResponse') s.noResponse++;
         else s.knowledgeErrors++;
         s.pending = Math.min(3, s.pending + 1);
-        s.dueAt = now + randRange(15, 28);
+        s.dueAt = now + randRange(15, 28, this.rng);
         break;
       case 'rhythm':
         s.misses++;
         s.streak = 0;
         s.rhythmErrors++;
         s.pending = Math.max(1, s.pending);
-        s.dueAt = now + randRange(22, 34);
+        s.dueAt = now + randRange(22, 34, this.rng);
         break;
     }
 

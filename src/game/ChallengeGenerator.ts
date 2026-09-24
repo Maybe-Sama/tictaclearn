@@ -3,6 +3,7 @@ import type { GrooveId, OptionSpec, Phrase, PhraseEvent } from '../rhythm/types'
 import type { GameState } from './GameStateMachine';
 import type { LearningTracker } from './LearningTracker';
 import { shuffle, weightedIndex } from '../util/random';
+import type { Rng } from '../util/rng';
 
 /**
  * Rhythm templates. Same grammar everywhere so the player can *feel* it:
@@ -88,6 +89,7 @@ export class ChallengeGenerator {
   constructor(
     private tracker: LearningTracker,
     private allItems: LearningItem[],
+    private rng: Rng,
   ) {}
 
   beginSection(): void {
@@ -179,7 +181,7 @@ export class ChallengeGenerator {
         if (this.lastTargets.includes(it.id)) w *= 0.08;
         return w;
       });
-      chosen.push(avail.splice(weightedIndex(weights), 1)[0]);
+      chosen.push(avail.splice(weightedIndex(weights, this.rng), 1)[0]);
     }
     return chosen;
   }
@@ -188,13 +190,13 @@ export class ChallengeGenerator {
   private pickCorrect(n: number, max = n - 1): number {
     const cands: number[] = [];
     for (let i = 0; i <= Math.min(max, n - 1); i++) if (i !== this.lastIdx || n === 1) cands.push(i);
-    const i = cands[weightedIndex(cands.map((c) => (c === 0 && n > 2 ? 0.6 : 1)))];
+    const i = cands[weightedIndex(cands.map((c) => (c === 0 && n > 2 ? 0.6 : 1)), this.rng)];
     this.lastIdx = i;
     return i;
   }
 
   private pickDouble(n: number, gap: 1 | 2): number[] {
-    const i = Math.floor(Math.random() * (n - gap));
+    const i = this.rng.int(n - gap);
     return [i, i + gap];
   }
 
@@ -220,21 +222,21 @@ export class ChallengeGenerator {
     };
     for (const t of targets) {
       const conf = this.tracker.topConfusions(t.id).map((id) => this.decoys.get(id) ?? this.allItems.find((i) => i.id === id));
-      if (conf.length && Math.random() < 0.7) add(conf[0]);
+      if (conf.length && this.rng.chance(0.7)) add(conf[0]);
       // The famous-but-wrong city is the whole point of a trap: it shows up most of the time.
-      shuffle(t.decoys ?? []).forEach((label, k) => {
-        if (Math.random() < (k === 0 ? 0.85 : 0.45)) add(this.decoy(label));
+      shuffle(t.decoys ?? [], this.rng).forEach((label, k) => {
+        if (this.rng.chance(k === 0 ? 0.85 : 0.45)) add(this.decoy(label));
       });
       // "Is this Italy… or Mexico?" — the confusions worth practising.
-      shuffle(t.lookalikes ?? [])
+      shuffle(t.lookalikes ?? [], this.rng)
         .slice(0, 2)
         .forEach((id) => {
-          if (Math.random() < this.lookalikeRate) add(pool.find((i) => i.id === id) ?? this.allItems.find((i) => i.id === id));
+          if (this.rng.chance(this.lookalikeRate)) add(pool.find((i) => i.id === id) ?? this.allItems.find((i) => i.id === id));
         });
     }
-    if (prefer) for (const it of shuffle(prefer).slice(0, Math.ceil(count / 2) + 1)) add(it);
-    for (const it of shuffle(pool)) add(it);
-    for (const it of shuffle(this.allItems)) add(it);
-    return shuffle(out);
+    if (prefer) for (const it of shuffle(prefer, this.rng).slice(0, Math.ceil(count / 2) + 1)) add(it);
+    for (const it of shuffle(pool, this.rng)) add(it);
+    for (const it of shuffle(this.allItems, this.rng)) add(it);
+    return shuffle(out, this.rng);
   }
 }

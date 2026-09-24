@@ -12,6 +12,7 @@ import type { FreeScreen, TourScreen } from '../ui/Hubs';
 import type { ChoiceScreen } from '../ui/Choice';
 import { preloadFlags } from '../content/flags';
 import { setVoice, silence, voiceEnabled } from '../util/voice';
+import { Rng, randomSeed } from '../util/rng';
 import { Progress } from './Progress';
 import { buildTour, nextConcert, starsFor, type ConcertDef, type StageDef } from './Tour';
 import type { Stage } from '../ui/Stage';
@@ -40,6 +41,8 @@ export interface GameOptions {
   debug: boolean;
   /** Debug bot: 'good' | 'spam' | 'wrong'. */
   autoplay: string | null;
+  /** `?seed=` — forces every session of this page load onto the same stream. */
+  seed: number | null;
 }
 
 const DIFF_COLORS: Record<string, string> = { facil: '#7ed957', normal: '#FFD23F', dificil: '#FF8C42', experto: '#FF4F6D' };
@@ -88,6 +91,9 @@ export class Game {
   /** Difficulty chosen for Beat Libre (the Tour runs on its own ramp). */
   private userDiff: DifficultySettings = DIFFICULTIES.normal;
   private pending: 'tour' | 'free' = 'tour';
+  /** Seed of the session being played; survives into the results screen. */
+  lastSeed: number;
+  private rng: Rng;
   readonly progress = new Progress();
   private tours = new Map<string, StageDef[]>();
 
@@ -98,6 +104,8 @@ export class Game {
     private ui: GameUI,
     private opts: GameOptions,
   ) {
+    this.lastSeed = opts.seed ?? randomSeed();
+    this.rng = new Rng(this.lastSeed);
     const savedSubject = loadSubject();
     this.pack = packs.find((p) => p.id === savedSubject) ?? packs[0];
     ui.stage.pack = this.pack;
@@ -131,7 +139,7 @@ export class Game {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.pause();
     });
-    if (opts.autoplay) this.bot = new Bot(opts.autoplay, (t) => this.pressAt(t), () => this.engine);
+    if (opts.autoplay) this.bot = new Bot(opts.autoplay, (t) => this.pressAt(t), () => this.engine, this.rng.fork('bot'));
     this.onStateChange(GameState.Menu);
     requestAnimationFrame(this.frame);
   }
@@ -139,8 +147,35 @@ export class Game {
   private newTracker(level: LevelId, carry?: LearningTracker): LearningTracker {
     return new LearningTracker(
       this.pack.levels[level].items.map((id) => this.pack.byId(id)),
+      this.rng.fork('tracker'),
       carry,
     );
+  }
+
+  /**
+   * One session = one seeded stream. With an explicit `?seed` every run of this
+   * page load is the same song and the same setlist; otherwise a new seed is
+   * drawn so replays still feel fresh.
+   */
+  private beginSession(): void {
+    this.lastSeed = this.opts.seed ?? randomSeed();
+    this.rng = new Rng(this.lastSeed);
+  }
+
+  /** Seeded from the URL: the session must be reproducible, so nothing may adapt. */
+  private get deterministic(): boolean {
+    return this.opts.seed !== null;
+  }
+
+  /** Enough to tell two runs apart: the song, and the phrases already written. */
+  sessionFingerprint(): { seed: number; band: number; progression: number; transpose: number; phrases: string[] } {
+    return {
+      seed: this.lastSeed,
+      band: this.mix.band,
+      progression: this.mix.progression,
+      transpose: this.mix.transpose,
+      phrases: this.engine ? [...this.engine.phraseLog] : [],
+    };
   }
 
   setDifficulty(id: DifficultyId): void {
@@ -287,6 +322,7 @@ export class Game {
 
   /** Beat 1 / Beat 2 quick play. */
   start(level: LevelId, replay: boolean): void {
+    this.beginSession();
     this.diff = this.userDiff;
     const sameLevel = replay && level === this.level && this.mode.kind === 'beat';
     this.level = level;
@@ -298,6 +334,7 @@ export class Game {
 
   /** A Beat Tour concert: new countries + a review of earlier ones from the same stage. */
   startConcert(c: ConcertDef): void {
+    this.beginSession();
     this.mode = { kind: 'tour', concert: c };
     // The Tour has no difficulty selector: the concert's own ramp sets the challenge.
     this.diff = DIFFICULTIES.normal;
@@ -316,7 +353,7 @@ export class Game {
       pool = [...newItems, ...review.map((id) => this.pack.byId(id))];
       weak = review;
     }
-    const tracker = new LearningTracker(pool);
+    const tracker = new LearningTracker(pool, this.rng.fork('tracker'));
     tracker.boost(weak);
     const depth = c.stage.index / 6;
     const plan: SessionPlan = { title: c.stage.name, sub: c.theme ?? c.title, pill: `${c.stage.name} · ${c.final ? 'FINAL' : c.index + 1}`, newItems, pool, params: c.params, final: c.final, depth };
@@ -325,12 +362,13 @@ export class Game {
 
   /** Beat Libre: your own set. Unknown countries get taught first (up to 6). */
   startFree(ids: string[]): void {
+    this.beginSession();
     this.mode = { kind: 'free', ids };
     this.diff = this.userDiff;
     const P = this.pack.id;
     const pool = ids.map((id) => this.pack.byId(id));
     const newItems = pool.filter((i) => this.progress.level(P, i.id) === 'nuevo').slice(0, 6);
-    const tracker = new LearningTracker(pool);
+    const tracker = new LearningTracker(pool, this.rng.fork('tracker'));
     tracker.boost(ids.filter((id) => this.progress.level(P, id) === 'aprendiendo'));
     const n = pool.length;
     const plan: SessionPlan = {
@@ -364,10 +402,11 @@ export class Game {
     preloadFlags(tracker.all().map((s) => s.id));
     this.stats = new SessionStats(this.diff.feverAt, this.diff.scoreMult);
     // A different band, chord loop and key every run: replays don't sound the same.
-    Object.assign(this.mix, rollSong());
-    this.dd = new DifficultyDirector(this.diff);
-    const cg = new ChallengeGenerator(this.tracker, this.pack.items);
-    this.setlist = new Setlist(this.pack, cg, this.dd, this.diff, opts);
+    Object.assign(this.mix, rollSong(this.rng.fork('music')));
+    this.dd = new DifficultyDirector(this.diff, this.deterministic);
+    const cg = new ChallengeGenerator(this.tracker, this.pack.items, this.rng.fork('challenges'));
+    this.setlist = new Setlist(this.pack, cg, this.dd, this.diff, this.rng.fork('setlist'), opts);
+    if (this.bot) this.bot.rng = this.rng.fork('bot');
     this.engine = new RhythmEngine(a, this.setlist, this.mix);
     this.engine.prePlay = (o) => this.inGroove(o);
     this.judge = new Judge(this.engine, this.diff.windows);
@@ -850,6 +889,7 @@ class Bot {
     private mode: string,
     private press: (t: number) => void,
     private engine: () => RhythmEngine | null,
+    public rng: Rng,
   ) {}
 
   tick(now: number): void {
@@ -873,7 +913,7 @@ class Bot {
         if (!want || this.pressed.has(o) || o.state !== 'pending') continue;
         let j = this.jitter.get(o);
         if (j === undefined) {
-          j = (Math.random() - 0.5) * 0.12;
+          j = (this.rng.next() - 0.5) * 0.12;
           this.jitter.set(o, j);
         }
         if (now >= o.time + j) {

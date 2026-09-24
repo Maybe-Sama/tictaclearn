@@ -1,5 +1,6 @@
 import type { AudioEngine } from './AudioEngine';
 import type { GrooveId, ScheduledPhrase } from '../rhythm/types';
+import type { Rng } from '../util/rng';
 
 interface Chord {
   root: number;
@@ -150,11 +151,11 @@ const ROLE: Record<Exclude<GrooveId, 'finale'>, 'low' | 'mid' | 'high'> = {
 };
 
 /** A fresh song for a session: band, chord loop and key. */
-export function rollSong(): { band: number; progression: number; transpose: number } {
+export function rollSong(rng: Rng): { band: number; progression: number; transpose: number } {
   return {
-    band: Math.floor(Math.random() * BANDS.length),
-    progression: Math.floor(Math.random() * PROGRESSIONS.length),
-    transpose: Math.floor(Math.random() * 7) - 3,
+    band: rng.int(BANDS.length),
+    progression: rng.int(PROGRESSIONS.length),
+    transpose: rng.int(7) - 3,
   };
 }
 

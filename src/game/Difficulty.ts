@@ -114,16 +114,26 @@ export const DIFFICULTY_ORDER: DifficultyId[] = ['facil', 'normal', 'dificil', '
 export class DifficultyDirector {
   skill: number;
 
-  constructor(private settings: DifficultySettings) {
+  /**
+   * `frozen` pins the skill to its starting value. A seeded session must play
+   * the same setlist for everyone who runs that seed, and an adaptive tier that
+   * follows this player's hits would make the phrase sequence diverge.
+   */
+  constructor(
+    private settings: DifficultySettings,
+    private frozen = false,
+  ) {
     this.skill = settings.startSkill;
   }
 
   recordAnswer(outcome: Outcome): void {
+    if (this.frozen) return;
     const v = outcome === 'clean' ? 1 : outcome === 'rhythm' ? 0.55 : outcome === 'hitWithErrors' ? 0.25 : 0;
     this.skill = this.skill * 0.7 + v * 0.3;
   }
 
   recordDrum(hit: boolean): void {
+    if (this.frozen) return;
     this.skill = this.skill * 0.97 + (hit ? 1 : 0) * 0.03;
   }
 

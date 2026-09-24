@@ -10,10 +10,12 @@ import { Stage } from './ui/Stage';
 import { FreeScreen, TourScreen } from './ui/Hubs';
 import { ChoiceScreen } from './ui/Choice';
 import { applyLayout, pickLayout, TOUCH } from './ui/layout';
+import { parseSeed } from './util/rng';
 
 const params = new URLSearchParams(location.search);
 const debug = params.get('debug') === '1';
 const autoplay = debug ? params.get('autoplay') : null;
+const seed = parseSeed(params.get('seed'));
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const stageEl = document.getElementById('stage')!;
@@ -38,7 +40,7 @@ const choice = new ChoiceScreen(stageEl, 'flow');
 const tour = new TourScreen(stageEl);
 const free = new FreeScreen(stageEl);
 
-const game = new Game(PACKS, { stage, menu, results, pause, calib, tour, free, choice, fx, debug: debug ? new DebugPanel() : null }, { debug, autoplay });
+const game = new Game(PACKS, { stage, menu, results, pause, calib, tour, free, choice, fx, debug: debug ? new DebugPanel() : null }, { debug, autoplay, seed });
 // Taps anywhere (letterbox bands included) count as hits.
 new Input(document.body).on((a, ts) => game.onAction(a, ts));
 

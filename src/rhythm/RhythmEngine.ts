@@ -25,6 +25,8 @@ const PUMP_MS = 25;
  */
 export class RhythmEngine {
   readonly phrases: ScheduledPhrase[] = [];
+  /** Every phrase label in schedule order. `phrases` is pruned as the song runs; this is not. */
+  readonly phraseLog: string[] = [];
   readonly challenges: Challenge[] = [];
   songStart = 0;
   songEnd = Infinity;
@@ -134,6 +136,7 @@ export class RhythmEngine {
     const start = this.nextStart;
     const sp: ScheduledPhrase = { phrase: p, start, end: start + p.beats * beatDur, beatDur, globalBeat: this.globalBeat, index: this.phraseCount++ };
     this.phrases.push(sp);
+    this.phraseLog.push(p.label);
     this.nextStart = sp.end;
     this.globalBeat += p.beats;
     this.lastBeatDur = beatDur;
