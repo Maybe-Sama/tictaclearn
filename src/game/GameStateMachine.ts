@@ -10,6 +10,8 @@ export enum GameState {
   Calibration = 'Calibration',
   Tour = 'Tour',
   Free = 'Free',
+  Subject = 'Subject',
+  Difficulty = 'Difficulty',
 }
 
 const ORDER: GameState[] = [
@@ -23,7 +25,7 @@ const ORDER: GameState[] = [
 ];
 
 export const PLAYING_STATES = new Set<GameState>(ORDER.slice(0, -1));
-const HUBS = new Set<GameState>([GameState.Menu, GameState.Results, GameState.Calibration, GameState.Tour, GameState.Free]);
+const HUBS = new Set<GameState>([GameState.Menu, GameState.Results, GameState.Calibration, GameState.Tour, GameState.Free, GameState.Subject, GameState.Difficulty]);
 
 type Listener = (to: GameState, from: GameState) => void;
 
@@ -50,7 +52,7 @@ export class GameStateMachine {
     // Hub screens (menu, tour map, free picker, calibration, results) can reach each other or start a song.
     if (HUBS.has(from)) return HUBS.has(to) || PLAYING_STATES.has(to);
     // Leaving a song early goes back to its hub.
-    if (PLAYING_STATES.has(from) && (to === GameState.Tour || to === GameState.Free)) return true;
+    if (PLAYING_STATES.has(from) && HUBS.has(to)) return true;
     return ORDER.indexOf(to) > ORDER.indexOf(from);
   }
 

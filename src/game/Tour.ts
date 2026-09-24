@@ -2,7 +2,6 @@ import { CONTINENTS } from '../content/countries';
 import type { ContentPack } from '../content/types';
 import type { GrooveId } from '../rhythm/types';
 import type { Tier } from './Difficulty';
-import type { Progress } from './Progress';
 
 /**
  * BEAT TOUR: a world tour. Each continent is a stage, each level a concert.
@@ -108,27 +107,7 @@ export function buildTour(pack: ContentPack): StageDef[] {
   return stages;
 }
 
-// ------------------------------------------------------------------ unlocking
-
-export function stageUnlocked(stages: StageDef[], progress: Progress, subject: string, index: number): boolean {
-  if (index === 0) return true;
-  const passed = (s: StageDef) => s.concerts.filter((c) => progress.concert(subject, c.id)?.passed).length;
-  if (index === stages.length - 1) {
-    // Gira Mundial: after passing the Gran Final of 3 continents.
-    return stages.slice(0, -1).filter((s) => progress.concert(subject, s.concerts[s.concerts.length - 1].id)?.passed).length >= 3;
-  }
-  // Next continent opens halfway through the previous one: no long waits.
-  const prev = stages[index - 1];
-  return stageUnlocked(stages, progress, subject, index - 1) && passed(prev) >= Math.ceil(prev.concerts.length / 2);
-}
-
-export function concertUnlocked(stages: StageDef[], progress: Progress, subject: string, c: ConcertDef): boolean {
-  if (!stageUnlocked(stages, progress, subject, c.stage.index)) return false;
-  if (c.index === 0) return true;
-  // Themed world concerts are all open once the world is.
-  if (c.stage.id === 'mundo' && !c.final) return true;
-  return !!progress.concert(subject, c.stage.concerts[c.index - 1].id)?.passed;
-}
+// ------------------------------------------------------------------ navigation
 
 export function nextConcert(c: ConcertDef): ConcertDef | null {
   return c.stage.concerts[c.index + 1] ?? null;

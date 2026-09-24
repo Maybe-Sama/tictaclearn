@@ -184,7 +184,7 @@ export class AudioEngine {
     this.noise(t, 0.6, v * 0.5, 'bandpass', 9000, 0.8, this.music);
   }
 
-  bass(t: number, midi: number, dur: number, v = 0.45): void {
+  bass(t: number, midi: number, dur: number, v = 0.45, type: OscillatorType = 'sawtooth'): void {
     const f = this.ctx.createBiquadFilter();
     f.type = 'lowpass';
     f.Q.value = 5;
@@ -192,24 +192,24 @@ export class AudioEngine {
     f.frequency.exponentialRampToValueAtTime(240, t + Math.max(0.06, dur));
     const g = this.vca(t, v, 0.006, dur, this.music);
     f.connect(g);
-    this.osc('sawtooth', mtof(midi), t, t + dur + 0.1, f);
+    this.osc(type, mtof(midi), t, t + dur + 0.1, f);
     const sg = this.vca(t, v * 0.8, 0.006, dur, this.music);
     this.osc('sine', mtof(midi), t, t + dur + 0.1, sg);
   }
 
-  stab(t: number, notes: number[], dur = 0.13, v = 0.09): void {
+  stab(t: number, notes: number[], dur = 0.13, v = 0.09, type: OscillatorType = 'square'): void {
     const f = this.ctx.createBiquadFilter();
     f.type = 'lowpass';
     f.frequency.setValueAtTime(1800, t);
     f.frequency.exponentialRampToValueAtTime(700, t + dur);
     const g = this.vca(t, v, 0.004, dur, this.music);
     f.connect(g);
-    for (const n of notes) this.osc('square', mtof(n), t, t + dur + 0.1, f);
+    for (const n of notes) this.osc(type, mtof(n), t, t + dur + 0.1, f);
   }
 
-  pluck(t: number, midi: number, dur = 0.18, v = 0.12, toSfx = false): void {
+  pluck(t: number, midi: number, dur = 0.18, v = 0.12, toSfx = false, type: OscillatorType = 'triangle'): void {
     const dest = toSfx ? this.sfx : this.music;
-    this.tone('triangle', mtof(midi), t, dur, v, dest);
+    this.tone(type, mtof(midi), t, dur, v, dest);
     this.tone('square', mtof(midi), t, dur * 0.45, v * 0.22, dest);
   }
 

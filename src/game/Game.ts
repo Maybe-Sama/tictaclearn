@@ -1,5 +1,5 @@
 import { AudioEngine } from '../audio/AudioEngine';
-import type { MusicMix } from '../audio/Music';
+import { rollSong, BAND_NAMES, type MusicMix } from '../audio/Music';
 import type { ContentPack, LearningItem } from '../content/types';
 import type { Action } from '../input/Input';
 import { Judge } from '../rhythm/Judge';
@@ -9,10 +9,11 @@ import type { DebugPanel } from '../ui/Debug';
 import type { Particles } from '../ui/Particles';
 import type { CalibrationScreen, Menu, PauseOverlay, ResultsData, ResultsScreen } from '../ui/Screens';
 import type { FreeScreen, TourScreen } from '../ui/Hubs';
+import type { ChoiceScreen } from '../ui/Choice';
 import { preloadFlags } from '../content/flags';
 import { setVoice, silence, voiceEnabled } from '../util/voice';
 import { Progress } from './Progress';
-import { buildTour, concertUnlocked, nextConcert, starsFor, type ConcertDef, type StageDef } from './Tour';
+import { buildTour, nextConcert, starsFor, type ConcertDef, type StageDef } from './Tour';
 import type { Stage } from '../ui/Stage';
 import { loadBest, loadDifficulty, loadOffset, loadSubject, saveBest, saveDifficulty, saveOffset, saveSubject } from '../util/storage';
 import { ChallengeGenerator } from './ChallengeGenerator';
@@ -30,6 +31,7 @@ export interface GameUI {
   calib: CalibrationScreen;
   tour: TourScreen;
   free: FreeScreen;
+  choice: ChoiceScreen;
   fx: Particles;
   debug: DebugPanel | null;
 }
@@ -39,6 +41,8 @@ export interface GameOptions {
   /** Debug bot: 'good' | 'spam' | 'wrong'. */
   autoplay: string | null;
 }
+
+const DIFF_COLORS: Record<string, string> = { facil: '#7ed957', normal: '#FFD23F', dificil: '#FF8C42', experto: '#FF4F6D' };
 
 /** Band layers you start each section with (combo adds the rest). */
 const SECTION_BASE_LAYER: Partial<Record<GameState, number>> = {
@@ -69,7 +73,7 @@ export class Game {
   diff: DifficultySettings = DIFFICULTIES.normal;
   dd = new DifficultyDirector(this.diff);
   stats = new SessionStats();
-  readonly mix: MusicMix = { level: 1 };
+  readonly mix: MusicMix = { level: 1, band: 0, progression: 0, transpose: 0 };
   private level: LevelId = 1;
   private setlist: Setlist | null = null;
   private paused = false;
@@ -81,6 +85,9 @@ export class Game {
   private bot: Bot | null = null;
   private calib: Calib | null = null;
   private mode: Mode = { kind: 'beat', level: 1 };
+  /** Difficulty chosen for Beat Libre (the Tour runs on its own ramp). */
+  private userDiff: DifficultySettings = DIFFICULTIES.normal;
+  private pending: 'tour' | 'free' = 'tour';
   readonly progress = new Progress();
   private tours = new Map<string, StageDef[]>();
 
@@ -93,28 +100,25 @@ export class Game {
   ) {
     const savedSubject = loadSubject();
     this.pack = packs.find((p) => p.id === savedSubject) ?? packs[0];
-    ui.menu.onSubject = (id) => this.setSubject(id);
-    ui.menu.setSubject(this.pack);
     ui.stage.pack = this.pack;
     ui.results.pack = this.pack;
     this.tracker = this.newTracker(1);
     const saved = loadDifficulty();
-    if (saved && saved in DIFFICULTIES) this.diff = DIFFICULTIES[saved as DifficultyId];
-    ui.menu.onDifficulty = (id) => this.setDifficulty(id);
-    ui.menu.setDifficulty(this.diff.id);
+    if (saved && saved in DIFFICULTIES) this.userDiff = DIFFICULTIES[saved as DifficultyId];
+    this.diff = this.userDiff;
     this.fsm.onChange((to) => this.onStateChange(to));
-    ui.menu.onPlay = () => this.start(1, false);
-    ui.menu.onPlay2 = () => this.start(2, false);
-    ui.menu.onTour = () => this.openTour();
-    ui.menu.onFree = () => this.openFree();
+    ui.menu.onTour = () => this.chooseSubject('tour');
+    ui.menu.onFree = () => this.chooseSubject('free');
+    ui.choice.onBack = () => this.choiceBack();
+    ui.choice.onPick = (id) => this.choicePick(id);
     ui.menu.onVoice = () => this.toggleVoice();
     ui.menu.setVoice(voiceEnabled());
     ui.stage.onVoice = () => this.toggleVoice();
     ui.stage.setVoice(voiceEnabled());
     ui.menu.onCalibrate = () => this.startCalibration();
-    ui.tour.onBack = () => this.toMenu();
+    ui.tour.onBack = () => this.chooseSubject(this.pending);
     ui.tour.onPlay = (c) => this.startConcert(c);
-    ui.free.onBack = () => this.toMenu();
+    ui.free.onBack = () => this.chooseDifficulty();
     ui.free.onPlay = (ids) => this.startFree(ids);
     ui.results.onAgain = () => this.again();
     ui.results.onRestart = () => this.toHub();
@@ -140,10 +144,9 @@ export class Game {
   }
 
   setDifficulty(id: DifficultyId): void {
-    this.diff = DIFFICULTIES[id];
+    this.userDiff = DIFFICULTIES[id];
+    this.diff = this.userDiff;
     saveDifficulty(id);
-    this.ui.menu.setDifficulty(id);
-    this.ui.menu.show(this.fsm.state === GameState.Menu, loadBest(this.bestKey(1)));
   }
 
   /** Switch subject (Banderas / Capitales). Only from the menu. */
@@ -154,10 +157,7 @@ export class Game {
     saveSubject(id);
     this.ui.stage.pack = next;
     this.ui.results.pack = next;
-    this.ui.menu.setSubject(next);
-    this.ui.menu.setContinue(this.continueText());
     this.tracker = this.newTracker(1);
-    this.ui.menu.show(this.fsm.state === GameState.Menu, loadBest(this.bestKey(1)));
   }
 
   /** Records per subject + groove + difficulty (Banderas keeps its original keys). */
@@ -194,6 +194,56 @@ export class Game {
     return t;
   }
 
+  /** Step 1 of the flow: which subject. */
+  chooseSubject(kind: 'tour' | 'free'): void {
+    this.pending = kind;
+    this.stopSong();
+    this.ui.choice.open({
+      title: kind === 'tour' ? 'BEAT TOUR' : 'BEAT LIBRE',
+      sub: '¿Qué quieres aprender?',
+      back: 'INICIO',
+      selected: this.pack.id,
+      items: this.packs.map((p) => ({
+        id: p.id,
+        title: p.subtitle.toUpperCase(),
+        sub: p.rule.replace('Golpea los tambores… y ', '').replace(/^el |^la /, ''),
+        art: p.renderPrompt(p.byId(p.id === 'capitals' ? 'fr' : 'es')),
+      })),
+    });
+    this.fsm.transition(GameState.Subject);
+  }
+
+  /** Step 2 for Beat Libre: how hard the rhythm should be. */
+  chooseDifficulty(): void {
+    this.stopSong();
+    this.ui.choice.open({
+      title: 'DIFICULTAD',
+      sub: 'solo afecta al ritmo, no a las preguntas',
+      back: 'ASIGNATURA',
+      selected: this.userDiff.id,
+      items: DIFFICULTY_ORDER.map((id) => ({ id, title: DIFFICULTIES[id].label, sub: DIFFICULTIES[id].desc, color: DIFF_COLORS[id] })),
+    });
+    this.fsm.transition(GameState.Difficulty);
+  }
+
+  private choicePick(id: string): void {
+    if (this.fsm.state === GameState.Subject) {
+      this.setSubject(id);
+      if (this.pending === 'tour') this.openTour();
+      else this.chooseDifficulty();
+      return;
+    }
+    if (this.fsm.state === GameState.Difficulty) {
+      this.setDifficulty(id as DifficultyId);
+      this.openFree();
+    }
+  }
+
+  private choiceBack(): void {
+    if (this.fsm.state === GameState.Difficulty) this.chooseSubject('free');
+    else this.toMenu();
+  }
+
   openTour(stageIdx?: number, focus?: number): void {
     this.stopSong();
     this.ui.tour.open(this.pack, this.tour(), this.progress, stageIdx, focus);
@@ -202,24 +252,8 @@ export class Game {
 
   openFree(): void {
     this.stopSong();
-    this.ui.free.open(this.pack, this.progress);
+    this.ui.free.open(this.pack, this.progress, this.userDiff.label);
     this.fsm.transition(GameState.Free);
-  }
-
-  /** Where JUGAR will take you: the first unlocked concert you have not passed. */
-  private continueText(): string {
-    const P = this.pack.id;
-    const stages = this.tour();
-    const anyPlayed = stages.some((s) => s.concerts.some((c) => this.progress.concert(P, c.id)));
-    for (const st of stages) {
-      for (const c of st.concerts) {
-        if (!this.progress.concert(P, c.id)?.passed && concertUnlocked(stages, this.progress, P, c)) {
-          const name = c.final ? 'GRAN FINAL' : (c.theme ?? c.title);
-          return anyPlayed ? `Seguir el Beat Tour · ${st.name} · ${name}` : `Beat Tour · empieza en ${st.name}`;
-        }
-      }
-    }
-    return 'Beat Tour · ¡gira completada!';
   }
 
   private toggleVoice(): void {
@@ -245,7 +279,7 @@ export class Game {
   private nextFromResults(): void {
     if (this.mode.kind !== 'tour') return this.again();
     const n = nextConcert(this.mode.concert);
-    if (n && concertUnlocked(this.tour(), this.progress, this.pack.id, n)) this.startConcert(n);
+    if (n) this.startConcert(n);
     else this.toHub();
   }
 
@@ -253,6 +287,7 @@ export class Game {
 
   /** Beat 1 / Beat 2 quick play. */
   start(level: LevelId, replay: boolean): void {
+    this.diff = this.userDiff;
     const sameLevel = replay && level === this.level && this.mode.kind === 'beat';
     this.level = level;
     this.mode = { kind: 'beat', level };
@@ -264,6 +299,8 @@ export class Game {
   /** A Beat Tour concert: new countries + a review of earlier ones from the same stage. */
   startConcert(c: ConcertDef): void {
     this.mode = { kind: 'tour', concert: c };
+    // The Tour has no difficulty selector: the concert's own ramp sets the challenge.
+    this.diff = DIFFICULTIES.normal;
     const P = this.pack.id;
     const byUrgency = (ids: string[]) => [...ids].sort((a, b) => this.progress.urgency(P, a) - this.progress.urgency(P, b));
     let newItems: LearningItem[] = [];
@@ -289,6 +326,7 @@ export class Game {
   /** Beat Libre: your own set. Unknown countries get taught first (up to 6). */
   startFree(ids: string[]): void {
     this.mode = { kind: 'free', ids };
+    this.diff = this.userDiff;
     const P = this.pack.id;
     const pool = ids.map((id) => this.pack.byId(id));
     const newItems = pool.filter((i) => this.progress.level(P, i.id) === 'nuevo').slice(0, 6);
@@ -325,6 +363,8 @@ export class Game {
     this.tracker = tracker;
     preloadFlags(tracker.all().map((s) => s.id));
     this.stats = new SessionStats(this.diff.feverAt, this.diff.scoreMult);
+    // A different band, chord loop and key every run: replays don't sound the same.
+    Object.assign(this.mix, rollSong());
     this.dd = new DifficultyDirector(this.diff);
     const cg = new ChallengeGenerator(this.tracker, this.pack.items);
     this.setlist = new Setlist(this.pack, cg, this.dd, this.diff, opts);
@@ -449,7 +489,7 @@ export class Game {
     if (!PLAYING_STATES.has(to)) document.body.classList.remove('fever-mode');
     const playing = this.fsm.isPlaying;
     this.ui.menu.show(to === GameState.Menu, loadBest(this.bestKey(1)));
-    if (to === GameState.Menu) this.ui.menu.setContinue(this.continueText());
+    this.ui.choice.show(to === GameState.Subject || to === GameState.Difficulty);
     this.ui.stage.show(playing);
     this.ui.calib.show(to === GameState.Calibration);
     this.ui.tour.show(to === GameState.Tour);
@@ -522,29 +562,20 @@ export class Game {
 
   onAction(action: Action, ts: number): void {
     const s = this.fsm.state;
+    if (s === GameState.Subject || s === GameState.Difficulty) {
+      if (action === 'back') this.choiceBack();
+      else if (action === 'confirm') this.ui.choice.confirm();
+      else if (action === 'prev' || action === 'up') this.ui.choice.move(-1);
+      else if (action === 'next' || action === 'down') this.ui.choice.move(1);
+      return;
+    }
     if (s === GameState.Menu) {
-      if (this.ui.menu.settingsOpen) {
-        if (action === 'back' || action === 'confirm') this.ui.menu.closeSettings();
-        else if (action === 'prev' || action === 'next') {
-          const i = DIFFICULTY_ORDER.indexOf(this.diff.id) + (action === 'next' ? 1 : -1);
-          this.setDifficulty(DIFFICULTY_ORDER[Math.max(0, Math.min(DIFFICULTY_ORDER.length - 1, i))]);
-        }
-        return;
-      }
-      if (action === 'confirm') this.openTour();
-      else if (action === 'level1') this.start(1, false);
-      else if (action === 'level2') this.start(2, false);
-      else if (action === 'free') this.openFree();
+      if (action === 'confirm') this.chooseSubject('tour');
+      else if (action === 'free') this.chooseSubject('free');
       else if (action === 'voice') this.toggleVoice();
-      else if (action === 'up' || action === 'down') {
-        const i = this.packs.indexOf(this.pack);
-        this.setSubject(this.packs[(i + 1) % this.packs.length].id);
-      }
       else if (action === 'calibrate') this.startCalibration();
-      else if (action === 'prev' || action === 'next') {
-        const i = DIFFICULTY_ORDER.indexOf(this.diff.id) + (action === 'next' ? 1 : -1);
-        this.setDifficulty(DIFFICULTY_ORDER[Math.max(0, Math.min(DIFFICULTY_ORDER.length - 1, i))]);
-      }
+      else if (action === 'level1' && this.opts.debug) this.start(1, false);
+      else if (action === 'level2' && this.opts.debug) this.start(2, false);
       return;
     }
     if (s === GameState.Calibration) {
@@ -760,7 +791,7 @@ export class Game {
         latency: audio.latency,
         offset: audio.inputOffsetMs,
         combo: this.stats.combo,
-        extra: `${this.diff.id}  late ${engine.lateNotes}  layer ${this.mix.level}  skill ${this.dd.skill.toFixed(2)} (tier ${this.dd.tier})`,
+        extra: `${BAND_NAMES[this.mix.band]}+${this.mix.progression}/${this.mix.transpose}  ${this.diff.id}  late ${engine.lateNotes}  layer ${this.mix.level}  skill ${this.dd.skill.toFixed(2)} (tier ${this.dd.tier})`,
       });
     }
   };

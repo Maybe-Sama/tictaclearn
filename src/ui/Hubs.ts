@@ -1,15 +1,18 @@
 import { CONTINENTS } from '../content/countries';
 import type { ContentPack } from '../content/types';
 import type { Progress } from '../game/Progress';
-import { concertUnlocked, stageUnlocked, type ConcertDef, type StageDef } from '../game/Tour';
+import type { ConcertDef, StageDef } from '../game/Tour';
+
+const shuffled = <T>(a: T[]): T[] => [...a].sort(() => Math.random() - 0.5);
 
 const stars = (n: number): string => `<span class="stars" aria-label="${n} de 3 estrellas">${'★'.repeat(n)}<i>${'★'.repeat(3 - n)}</i></span>`;
 
-/** BEAT TOUR map: stages as tabs, concerts as a grid of stops. */
+/** BEAT TOUR: first pick the part of the world, then the concert. Nothing is locked. */
 export class TourScreen {
   readonly root: HTMLDivElement;
   onBack: () => void = () => {};
   onPlay: (c: ConcertDef) => void = () => {};
+  view: 'worlds' | 'concerts' = 'worlds';
   private stageIdx = 0;
   private focus = 0;
   private stages: StageDef[] = [];
@@ -26,8 +29,8 @@ export class TourScreen {
       e.stopPropagation();
       (t as HTMLButtonElement).blur?.();
       const act = t.dataset.act;
-      if (act === 'back') this.onBack();
-      else if (act === 'stage') this.selectStage(Number(t.dataset.i));
+      if (act === 'back') this.back();
+      else if (act === 'stage') this.openStage(Number(t.dataset.i));
       else if (act === 'concert') {
         this.focus = Number(t.dataset.i);
         this.confirm();
@@ -43,75 +46,95 @@ export class TourScreen {
     this.pack = pack;
     this.stages = stages;
     this.progress = progress;
-    if (stageIdx !== undefined) this.stageIdx = stageIdx;
-    else {
-      // Land on the furthest unlocked stage, on its first concert without stars.
-      let s = 0;
-      for (let i = 0; i < stages.length; i++) if (stageUnlocked(stages, progress, pack.id, i)) s = i;
-      this.stageIdx = s;
+    if (stageIdx === undefined) {
+      this.view = 'worlds';
+    } else {
+      this.view = 'concerts';
+      this.stageIdx = stageIdx;
+      this.focus = focus ?? 0;
     }
-    const st = stages[this.stageIdx];
-    this.focus = focus ?? Math.max(0, st.concerts.findIndex((c) => !progress.concert(pack.id, c.id)?.passed && concertUnlocked(stages, progress, pack.id, c)));
     this.render();
   }
 
-  selectStage(i: number): void {
-    if (!stageUnlocked(this.stages, this.progress, this.pack.id, i)) return;
+  /** Back goes worlds -> caller, concerts -> worlds. */
+  back(): void {
+    if (this.view === 'concerts') {
+      this.view = 'worlds';
+      this.render();
+    } else this.onBack();
+  }
+
+  private openStage(i: number): void {
     this.stageIdx = i;
-    this.focus = 0;
+    this.view = 'concerts';
+    const st = this.stages[i];
+    this.focus = Math.max(0, st.concerts.findIndex((c) => !this.progress.concert(this.pack.id, c.id)?.passed));
     this.render();
   }
 
   move(dx: number, dy: number): void {
-    if (dy) {
-      const i = this.stageIdx + dy;
-      if (i >= 0 && i < this.stages.length) this.selectStage(i);
-      return;
+    const d = dx || dy;
+    if (this.view === 'worlds') {
+      this.focus = Math.max(0, Math.min(this.stages.length - 1, this.focus + d));
+    } else {
+      this.focus = Math.max(0, Math.min(this.stages[this.stageIdx].concerts.length - 1, this.focus + d));
     }
-    const n = this.stages[this.stageIdx].concerts.length;
-    this.focus = Math.max(0, Math.min(n - 1, this.focus + dx));
     this.render();
   }
 
   confirm(): void {
+    if (this.view === 'worlds') {
+      this.openStage(this.focus);
+      return;
+    }
     const c = this.stages[this.stageIdx]?.concerts[this.focus];
-    if (c && concertUnlocked(this.stages, this.progress, this.pack.id, c)) this.onPlay(c);
+    if (c) this.onPlay(c);
+  }
+
+  private head(title: string, back: string): string {
+    const all = this.stages.flatMap((s) => s.concerts.map((c) => c.id));
+    const total = this.progress.totalStars(this.pack.id, all);
+    return `<div class="hub-head">
+        <button type="button" class="hub-back" data-act="back">‹ ${back}</button>
+        <h2>${title}<small>${this.pack.subtitle}</small></h2>
+        <div class="hub-stars">★ ${total}<small>/${all.length * 3}</small></div>
+      </div>`;
   }
 
   private render(): void {
     const { pack, progress, stages } = this;
-    const all = stages.flatMap((s) => s.concerts.map((c) => c.id));
-    const total = progress.totalStars(pack.id, all);
+    if (this.view === 'worlds') {
+      const cards = stages
+        .map((s, i) => {
+          const got = progress.totalStars(pack.id, s.concerts.map((c) => c.id));
+          const done = s.concerts.filter((c) => progress.concert(pack.id, c.id)?.passed).length;
+          const flags = s.itemIds.slice(0, 6).map((id) => pack.renderPrompt(pack.byId(id))).join('');
+          return `<button type="button" class="world-card${i === this.focus ? ' focus' : ''}" data-act="stage" data-i="${i}" style="--sc:${s.color}">
+            <span class="wc-top"><b>${s.name}</b><small>${s.itemIds.length} ${pack.noun}</small></span>
+            <span class="wc-flags">${flags}</span>
+            <span class="wc-foot"><span class="stars">★ ${got}<i>/${s.concerts.length * 3}</i></span><small>${done}/${s.concerts.length} conciertos</small></span>
+          </button>`;
+        })
+        .join('');
+      this.root.innerHTML = `${this.head('ELIGE ZONA', 'ATRÁS')}
+        <div class="world-cards">${cards}</div>
+        <p class="hub-hint">Puedes empezar por donde quieras. Cada concierto enseña países nuevos y repasa los anteriores.</p>`;
+      return;
+    }
     const stage = stages[this.stageIdx];
-    const tabs = stages
-      .map((s, i) => {
-        const open = stageUnlocked(stages, progress, pack.id, i);
-        const got = progress.totalStars(pack.id, s.concerts.map((c) => c.id));
-        return `<button type="button" class="stage-tab${i === this.stageIdx ? ' on' : ''}${open ? '' : ' locked'}" data-act="stage" data-i="${i}" style="--sc:${s.color}" ${open ? '' : 'aria-disabled="true"'}>
-          <b>${i + 1}</b><span>${s.name}</span><small>${open ? `★ ${got}/${s.concerts.length * 3}` : '🔒'}</small></button>`;
-      })
-      .join('');
     const grid = stage.concerts
       .map((c, i) => {
-        const open = concertUnlocked(stages, progress, pack.id, c);
         const rec = progress.concert(pack.id, c.id);
         const flags = (c.newIds.length ? c.newIds : c.poolIds).slice(0, 5).map((id) => pack.renderPrompt(pack.byId(id))).join('');
-        return `<button type="button" class="stop${c.final ? ' final' : ''}${open ? '' : ' locked'}${rec?.passed ? ' done' : ''}${i === this.focus ? ' focus' : ''}" data-act="concert" data-i="${i}" style="--sc:${stage.color}" ${open ? '' : 'aria-disabled="true"'}>
-          <span class="stop-num">${c.final ? '♛' : open ? i + 1 : '🔒'}</span>
+        return `<button type="button" class="stop${c.final ? ' final' : ''}${rec?.passed ? ' done' : ''}${i === this.focus ? ' focus' : ''}" data-act="concert" data-i="${i}" style="--sc:${stage.color}">
+          <span class="stop-num">${c.final ? '♛' : i + 1}</span>
           <span class="stop-title">${c.theme ?? c.title}</span>
           ${stars(rec?.stars ?? 0)}
           <span class="stop-flags">${flags}</span>
         </button>`;
       })
       .join('');
-    this.root.innerHTML = `
-      <div class="hub-head">
-        <button type="button" class="hub-back" data-act="back">‹ MENÚ</button>
-        <h2>BEAT TOUR <small>${pack.subtitle}</small></h2>
-        <div class="hub-stars">★ ${total}<small>/${all.length * 3}</small></div>
-      </div>
-      <div class="stage-tabs">${tabs}</div>
-      <div class="stage-name" style="--sc:${stage.color}">${stage.name}<small>${stage.itemIds.length} ${pack.noun}</small></div>
+    this.root.innerHTML = `${this.head(stage.name, 'ZONAS')}
       <div class="stops">${grid}</div>
       <p class="hub-hint">Supera cada concierto reconociendo el 70 %. La 3.ª estrella necesita, además, ir a ritmo.</p>`;
   }
@@ -124,6 +147,7 @@ export class FreeScreen {
   onPlay: (ids: string[]) => void = () => {};
   private selected = new Set<string>();
   private filter = 'europa';
+  private difficulty = '';
   private pack!: ContentPack;
   private progress!: Progress;
 
@@ -157,6 +181,16 @@ export class FreeScreen {
       } else if (act === 'clear') {
         this.selected.clear();
         this.render();
+      } else if (act === 'random') {
+        this.selected.clear();
+        shuffled(this.pack.items.map((i) => i.id))
+          .slice(0, 10)
+          .forEach((id) => this.selected.add(id));
+        this.render();
+      } else if (act === 'randomHere') {
+        this.selected.clear();
+        shuffled(this.visible()).slice(0, 10).forEach((id) => this.selected.add(id));
+        this.render();
       } else if (act === 'play') this.play();
     });
   }
@@ -165,10 +199,11 @@ export class FreeScreen {
     this.root.classList.toggle('hidden', !v);
   }
 
-  open(pack: ContentPack, progress: Progress): void {
+  open(pack: ContentPack, progress: Progress, difficulty = ''): void {
     if (this.pack !== pack) this.selected.clear();
     this.pack = pack;
     this.progress = progress;
+    this.difficulty = difficulty;
     this.render();
   }
 
@@ -204,12 +239,14 @@ export class FreeScreen {
     const weakCount = this.weakest().length;
     this.root.innerHTML = `
       <div class="hub-head">
-        <button type="button" class="hub-back" data-act="back">‹ MENÚ</button>
-        <h2>BEAT LIBRE <small>${pack.subtitle}</small></h2>
+        <button type="button" class="hub-back" data-act="back">‹ ATRÁS</button>
+        <h2>BEAT LIBRE <small>${pack.subtitle}${this.difficulty ? ` · ${this.difficulty}` : ''}</small></h2>
         <div class="legend"><i class="m-nuevo"></i>nuevo <i class="m-aprendiendo"></i>aprendiendo <i class="m-dominado"></i>dominado</div>
       </div>
       <div class="stage-tabs">${tabs}</div>
       <div class="free-tools">
+        <button type="button" class="chip hot" data-act="random">🎲 ALEATORIO (10 del mundo)</button>
+        <button type="button" class="chip" data-act="randomHere">🎲 10 DE ${CONTINENTS.find((c) => c.id === this.filter)!.name}</button>
         <button type="button" class="chip" data-act="all">+ TODO ${CONTINENTS.find((c) => c.id === this.filter)!.name}</button>
         <button type="button" class="chip" data-act="weak" ${weakCount ? '' : 'disabled'}>LOS QUE FALLO (${weakCount})</button>
         <button type="button" class="chip" data-act="clear">LIMPIAR</button>

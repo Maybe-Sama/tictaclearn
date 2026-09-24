@@ -1,7 +1,6 @@
 import type { ContentPack, LearningItem } from '../content/types';
 import { GLOBE_SVG } from './art';
 import { TOUCH, inputWord } from './layout';
-import { DIFFICULTIES, DIFFICULTY_ORDER, type DifficultyId } from '../game/Difficulty';
 
 function el<T extends HTMLElement = HTMLDivElement>(cls: string, html = '', tag = 'div'): T {
   const e = document.createElement(tag) as T;
@@ -13,23 +12,16 @@ function el<T extends HTMLElement = HTMLDivElement>(cls: string, html = '', tag 
 const LETTER_COLORS = ['#FF5D8F', '#16C2A3', '#4FB3FF', '#FFD23F', '#A98BFF', '#FF8C42'];
 
 /**
- * Landing, organised as three steps: pick a subject, press JUGAR (continues
- * the Beat Tour), or pick another mode. Everything else lives in Ajustes.
+ * Home: the two ways to play, and nothing else. Subject, difficulty and what
+ * to practise are asked afterwards, one question per screen.
  */
 export class Menu {
   readonly root: HTMLDivElement;
-  onPlay: () => void = () => {};
-  onPlay2: () => void = () => {};
   onTour: () => void = () => {};
   onFree: () => void = () => {};
   onVoice: () => void = () => {};
   onCalibrate: () => void = () => {};
-  onDifficulty: (id: DifficultyId) => void = () => {};
-  onSubject: (id: string) => void = () => {};
   private best: HTMLElement;
-  private diffDesc: HTMLElement;
-  private sheet: HTMLElement;
-  private diffLabel = 'NORMAL';
   private voiceOn = true;
 
   constructor(
@@ -49,135 +41,62 @@ export class Menu {
       .slice(0, 8)
       .map((it, i) => `<div class="mf" style="--x:${[6, 84, 12, 78, 3, 88, 2, 86][i]}%;--y:${[14, 10, 64, 60, 38, 34, 86, 84][i]}%;--r:${(i % 2 ? 1 : -1) * (6 + i * 2)}deg;--d:${i * 0.4}s">${pack.renderPrompt(it)}</div>`)
       .join('');
-    const cardArt: Record<string, string> = { flags: 'es', capitals: 'fr' };
-    const cardQ: Record<string, string> = { flags: '¿De qué país es la bandera?', capitals: '¿Cuál es su capital?' };
-    const cards = packs
-      .map((p) => {
-        const sample = p.items.find((i) => i.id === (cardArt[p.id] ?? p.items[0].id)) ?? p.items[0];
-        return `<button class="subject subject-card" type="button" role="radio" data-id="${p.id}">
-          <span class="sc-art">${p.renderPrompt(sample)}</span>
-          <span class="sc-text"><b>${p.subtitle.toUpperCase()}</b><span class="sc-q">${cardQ[p.id] ?? p.rule}</span></span>
-          <i class="sc-check">✓</i>
-        </button>`;
-      })
-      .join('');
+    const sample = ['es', 'jp', 'br', 'de'].map((id) => `<span class="hc-flag">${pack.renderPrompt(pack.byId(id))}</span>`).join('');
     this.root = el(
       'menu screen',
       `<div class="menu-flags" aria-hidden="true">${flags}</div>
        <div class="logo" aria-label="${pack.title}"><div class="logo-row">${word('WORLD', 0)}</div><div class="logo-row">${word('BEAT', 5)}</div></div>
-       <p class="menu-step">1 · ¿Qué quieres aprender?</p>
-       <div class="subject-cards" role="radiogroup" aria-label="Asignatura">${cards}</div>
-       <button class="btn-play btn-tour" type="button"><span class="play-main">▶ JUGAR</span><span class="play-sub"></span></button>
-       <p class="menu-hint"><span class="rule"></span>. ${TOUCH ? 'Toca la pantalla' : 'Pulsa <kbd>ESPACIO</kbd>'} al ritmo.</p>
-       <p class="menu-step">2 · Otros modos</p>
-       <div class="menu-modes">
-         <button class="mode btn-level1" type="button"><b>PARTIDA RÁPIDA</b><span class="mode-sub">3 min · con tutorial</span></button>
-         <button class="mode btn-level2" type="button"><b class="l2-name"></b><span class="mode-sub">para expertos</span></button>
-         <button class="mode btn-free" type="button"><b>BEAT LIBRE</b><span class="mode-sub">elige tus países</span></button>
+       <p class="menu-step">¿CÓMO QUIERES JUGAR?</p>
+       <div class="home-cards">
+         <button class="home-card btn-tour" type="button">
+           <span class="hc-art">${GLOBE_SVG}</span>
+           <b>BEAT TOUR</b>
+           <span class="hc-sub">La gira por el mundo: zonas, conciertos y estrellas</span>
+           <span class="hc-go">ENTER</span>
+         </button>
+         <button class="home-card btn-free" type="button">
+           <span class="hc-art flags">${sample}</span>
+           <b>BEAT LIBRE</b>
+           <span class="hc-sub">Tú eliges dificultad y qué países practicar</span>
+           <span class="hc-go">L</span>
+         </button>
        </div>
-       <button class="btn-settings" type="button">⚙ AJUSTES <span class="settings-sum"></span></button>
-       <div class="settings-sheet hidden" role="dialog" aria-label="Ajustes">
-         <div class="sheet-card">
-           <h3>AJUSTES</h3>
-           <p class="sheet-label">Dificultad del ritmo</p>
-           <div class="diff-row" role="radiogroup" aria-label="Dificultad">
-             ${DIFFICULTY_ORDER.map((id) => `<button class="diff d-${id}" type="button" role="radio" data-id="${id}">${DIFFICULTIES[id].label}</button>`).join('')}
-           </div>
-           <p class="diff-desc"></p>
-           <div class="sheet-row">
-             <button class="btn-voice" type="button">VOZ: <b class="voice-state"></b></button>
-             <button class="btn-calibrate" type="button">AJUSTAR RITMO</button>
-           </div>
-           <p class="sheet-note">¿Los golpes no cuadran con la música? Usa <b>Ajustar ritmo</b> (10 s).<br>La voz lee cada país nuevo; en algunos móviles puede descuadrar el ritmo.</p>
-           <p class="menu-best"></p>
-           <button class="btn-sheet-close" type="button">LISTO</button>
-         </div>
-       </div>`,
+       <p class="menu-hint">Golpea los tambores… y la respuesta correcta. ${TOUCH ? 'Toca la pantalla' : 'Pulsa <kbd>ESPACIO</kbd>'} al ritmo.</p>
+       <div class="menu-row small">
+         <button class="btn-calibrate" type="button">AJUSTAR RITMO <small>C</small></button>
+         <button class="btn-voice" type="button">VOZ: <b class="voice-state"></b> <small>V</small></button>
+       </div>
+       <p class="menu-best"></p>
+       ${packs.length ? '' : ''}`,
     );
     host.appendChild(this.root);
     this.best = this.root.querySelector('.menu-best')!;
-    this.diffDesc = this.root.querySelector('.diff-desc')!;
-    this.sheet = this.root.querySelector('.settings-sheet')!;
-    const wire = (sel: string, fn: (b: HTMLButtonElement) => void): void =>
+    const wire = (sel: string, fn: () => void): void =>
       this.root.querySelectorAll<HTMLButtonElement>(sel).forEach((b) =>
         b.addEventListener('click', (e) => {
           e.stopPropagation();
           b.blur();
-          fn(b);
+          fn();
         }),
       );
-    wire('.subject', (b) => this.onSubject(b.dataset.id!));
-    wire('.diff', (b) => this.onDifficulty(b.dataset.id as DifficultyId));
     wire('.btn-tour', () => this.onTour());
-    wire('.btn-level1', () => this.onPlay());
-    wire('.btn-level2', () => this.onPlay2());
     wire('.btn-free', () => this.onFree());
     wire('.btn-voice', () => this.onVoice());
-    wire('.btn-calibrate', () => {
-      this.closeSettings();
-      this.onCalibrate();
-    });
-    wire('.btn-settings', () => this.openSettings());
-    wire('.btn-sheet-close', () => this.closeSettings());
-    this.sheet.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (e.target === this.sheet) this.closeSettings();
-    });
+    wire('.btn-calibrate', () => this.onCalibrate());
   }
 
   show(v: boolean, best?: { score: number; combo: number }): void {
     this.root.classList.toggle('hidden', !v);
-    if (!v) this.closeSettings();
-    if (v) this.best.textContent = best && best.score > 0 ? `Récord en esta dificultad: ${best.score.toLocaleString('es-ES')} · mejor combo ${best.combo}` : '';
-  }
-
-  get settingsOpen(): boolean {
-    return !this.sheet.classList.contains('hidden');
-  }
-
-  openSettings(): void {
-    this.sheet.classList.remove('hidden');
-    this.sheet.querySelector('.sheet-card')!.animate([{ transform: 'translateY(40px) scale(.94)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 220, easing: 'ease-out' });
-  }
-
-  closeSettings(): void {
-    this.sheet.classList.add('hidden');
-  }
-
-  /** "Beat Tour · Europa · Concierto 2" under JUGAR. */
-  setContinue(text: string): void {
-    this.root.querySelector('.play-sub')!.textContent = text;
+    if (v) this.best.textContent = best && best.score > 0 ? `Récord: ${best.score.toLocaleString('es-ES')} · mejor combo ${best.combo}` : '';
   }
 
   setVoice(on: boolean): void {
     this.voiceOn = on;
     this.root.querySelector('.voice-state')!.textContent = on ? 'SÍ' : 'NO';
-    this.summary();
   }
 
-  setSubject(pack: ContentPack): void {
-    this.root.querySelectorAll<HTMLButtonElement>('.subject').forEach((b) => {
-      const on = b.dataset.id === pack.id;
-      b.classList.toggle('on', on);
-      b.setAttribute('aria-checked', String(on));
-    });
-    this.root.querySelector('.l2-name')!.textContent = pack.levels[2].name;
-    this.root.querySelector('.rule')!.textContent = pack.rule;
-  }
-
-  setDifficulty(id: DifficultyId): void {
-    this.root.querySelectorAll<HTMLButtonElement>('.diff').forEach((b) => {
-      const on = b.dataset.id === id;
-      b.classList.toggle('on', on);
-      b.setAttribute('aria-checked', String(on));
-    });
-    this.diffLabel = DIFFICULTIES[id].label;
-    this.diffDesc.textContent = DIFFICULTIES[id].desc;
-    this.summary();
-  }
-
-  private summary(): void {
-    this.root.querySelector('.settings-sum')!.textContent = `· ${this.diffLabel} · VOZ ${this.voiceOn ? 'SÍ' : 'NO'}`;
+  get voice(): boolean {
+    return this.voiceOn;
   }
 }
 

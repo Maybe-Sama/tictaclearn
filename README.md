@@ -2,10 +2,10 @@
 
 Prototipo jugable de un juego de ritmo educativo: **golpea los tambores… y el país de la bandera**, todo con una tecla y al ritmo.
 
-- **Asignatura** (↑/↓ o tocando en el menú): **Banderas** (bandera → país) o **Capitales** (bandera + país → capital).
+- **Flujo**: inicio con dos opciones (**Beat Tour** o **Beat Libre**) → asignatura (**Banderas** o **Capitales**) → en Tour eliges **zona del mundo** (todas abiertas) y concierto; en Libre eliges **dificultad** y luego los países (o **aleatorio**).
 - **Beat 1** (JUGAR): tutorial → Easy → Nuevo → Mix → Final, 8 países.
 - **Beat 2** (tecla `2`): en Banderas, *Gemelas* (Italia/México/Irlanda, Alemania/Bélgica, Polonia/Indonesia, Francia/Países Bajos); en Capitales, *Trampas*: la capital no es la ciudad famosa, y la famosa pasa por el carril como señuelo (Canberra/Sídney, Ottawa/Toronto, Ankara/Estambul, Berna/Zúrich, Rabat/Casablanca, Washington/Nueva York, Ámsterdam/La Haya, Nueva Delhi/Bombay).
-- **Dificultad** (←/→ en el menú): FÁCIL · NORMAL · DIFÍCIL · EXPERTO. Cambia BPM (−12 % … +12 %), ventanas de timing (±200 ms … ±105 ms para GOOD), límites de la dificultad adaptativa, contratiempos/flash/doble/a ciegas, umbral de FEVER, tutorial y multiplicador de puntos. Récord separado por groove y dificultad. Todo en `src/game/Difficulty.ts`.
+- **Dificultad** (solo Beat Libre; el Tour usa su propia rampa): FÁCIL · NORMAL · DIFÍCIL · EXPERTO. Cambia BPM (−12 % … +12 %), ventanas de timing (±200 ms … ±105 ms para GOOD), límites de la dificultad adaptativa, contratiempos/flash/doble/a ciegas, umbral de FEVER, tutorial y multiplicador de puntos. Récord separado por groove y dificultad. Todo en `src/game/Difficulty.ts`.
 - **Ajustar ritmo** (tecla `C`): 12 clics, pulsa con cada uno y guarda tu latencia.
 
 Mecánicas: tambores (siempre se golpean), tambores «y» a contratiempo, ráfagas (una bandera por compás), bandera flash (se tapa), tambores a ciegas, doble golpe. La banda suma capas con tu combo (8 / 16 / 30 = FEVER, puntos ×2) y se apaga un momento cuando fallas. Una dificultad dinámica invisible elige las plantillas del Mix y el Final según cómo juegas.
@@ -19,9 +19,15 @@ Una gira mundial por asignatura: **7 etapas** (Europa, América del Sur, Améric
 - El siguiente continente se abre al superar la mitad del anterior; la Gira Mundial, tras 3 Grandes Finales.
 - **Progreso y dominio de cada país se guardan** (localStorage, cajas de repaso espaciado): lo que fallas vuelve antes, también días después.
 
-**Beat Libre**: elige continente, países sueltos o "los que fallo". La lista muestra tu dominio (nuevo / aprendiendo / dominado).
+**Beat Libre**: elige dificultad y luego continente, países sueltos, "los que fallo" o **10 aleatorios**. La lista muestra tu dominio (nuevo / aprendiendo / dominado).
 
 Contenido: 195 países (193 ONU + Vaticano y Palestina) en `src/content/countries.ts`, con capital, continente, dificultad, señuelos y grupos de parecidas. Israel y Palestina no entran en Capitales (capital en disputa). Banderas: [flag-icons](https://github.com/lipis/flag-icons) (MIT), empaquetadas en local. La voz del navegador pronuncia cada país al presentarlo (tecla `V` para activar o desactivar).
+
+## Música
+
+Seis bandas (POP, FUNK, ROCK, LATINO, ELECTRO, CHIP) × 8 progresiones de acordes × 7 tonalidades: cada partida sortea una combinación (336 posibles), así que repetir un concierto no suena igual. Cada banda toca tres intensidades que se reparten entre las secciones, y las capas suben con tu combo. Todo sintetizado en tiempo real, sin samples ni derechos.
+
+Plan de producto: ver [PLAN.md](PLAN.md).
 
 ## Móvil y tablet
 
@@ -39,8 +45,8 @@ npm run build    # typecheck + build de producción
 
 - **ESPACIO** = golpear (también clic/toque en la pantalla)
 - **ENTER** = jugar / continuar / otra vez
-- Menú: **ENTER** = Beat Tour · **1** / **2** = Beat 1 / Beat 2 · **L** = Beat Libre · **C** = ajustar ritmo · **V** = voz · **←/→** = dificultad · **↑/↓** = asignatura
-- Mapa del Tour: **←/→** concierto · **↑/↓** etapa · **ENTER** jugar · **ESC** volver
+- Menú: **ENTER** = Beat Tour · **L** = Beat Libre · **C** = ajustar ritmo · **V** = voz
+- Pantallas de elección y mapa: **←/→** mover · **ENTER** elegir · **ESC** atrás
 - **ESC** = pausa (ENTER sigue, R reinicia)
 
 ## Debug

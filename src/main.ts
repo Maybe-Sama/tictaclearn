@@ -8,6 +8,7 @@ import { Particles } from './ui/Particles';
 import { CalibrationScreen, Menu, PauseOverlay, ResultsScreen } from './ui/Screens';
 import { Stage } from './ui/Stage';
 import { FreeScreen, TourScreen } from './ui/Hubs';
+import { ChoiceScreen } from './ui/Choice';
 import { applyLayout, pickLayout, TOUCH } from './ui/layout';
 
 const params = new URLSearchParams(location.search);
@@ -33,10 +34,11 @@ const menu = new Menu(stageEl, FLAGS_PACK, PACKS);
 const results = new ResultsScreen(stageEl, FLAGS_PACK);
 const pause = new PauseOverlay(stageEl);
 const calib = new CalibrationScreen(stageEl);
+const choice = new ChoiceScreen(stageEl, 'flow');
 const tour = new TourScreen(stageEl);
 const free = new FreeScreen(stageEl);
 
-const game = new Game(PACKS, { stage, menu, results, pause, calib, tour, free, fx, debug: debug ? new DebugPanel() : null }, { debug, autoplay });
+const game = new Game(PACKS, { stage, menu, results, pause, calib, tour, free, choice, fx, debug: debug ? new DebugPanel() : null }, { debug, autoplay });
 // Taps anywhere (letterbox bands included) count as hits.
 new Input(document.body).on((a, ts) => game.onAction(a, ts));
 

@@ -1700,3 +1700,112 @@ body.portrait .btn-voice-hud svg { width: 34px; height: 28px; }
 body.portrait .btn-voice-hud .vh-switch { width: 52px; height: 28px; }
 body.portrait .btn-voice-hud .vh-switch::after { width: 16px; height: 16px; left: 24px; }
 body.portrait .btn-voice-hud.off .vh-switch::after { left: -1px; }
+
+/* ============================================================ v9: two ways to play, one question per screen */
+.home-cards { display: flex; gap: 26px; margin-top: 10px; }
+.home-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 360px;
+  padding: 20px 22px 22px;
+  border: 7px solid var(--ink);
+  border-radius: 30px;
+  background: var(--cream);
+  box-shadow: 0 10px 0 var(--ink);
+  transition: transform 0.12s;
+}
+.home-card:hover { transform: translateY(-4px); }
+.home-card:active { transform: translateY(6px); box-shadow: 0 3px 0 var(--ink); }
+.home-card b { font-size: 44px; letter-spacing: 1px; }
+.home-card .hc-sub { font-size: 18px; opacity: 0.75; line-height: 1.15; text-align: center; }
+.home-card .hc-art { width: 118px; height: 88px; display: grid; place-items: center; }
+.home-card .hc-art svg { width: 100%; height: 100%; }
+.home-card .hc-art.flags { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.home-card .hc-flag { display: block; border: 3px solid var(--ink); border-radius: 5px; overflow: hidden; }
+.home-card .hc-go { position: absolute; top: -14px; right: -10px; padding: 3px 14px 5px; border: 4px solid var(--ink); border-radius: 999px; background: var(--sun); font-size: 15px; }
+body.touch .home-card .hc-go { display: none; }
+.btn-tour.home-card { background: var(--pink); color: var(--cream); }
+.btn-tour.home-card b { text-shadow: var(--outline); }
+.btn-tour.home-card .hc-sub { opacity: 0.95; }
+.btn-free.home-card { background: var(--sun); }
+body.portrait .home-cards { flex-direction: column; gap: 22px; margin-top: 18px; }
+body.portrait .home-card { width: 800px; flex-direction: row; justify-content: flex-start; text-align: left; padding: 20px 26px; gap: 22px; }
+body.portrait .home-card .hc-art { width: 150px; height: 112px; flex: none; }
+body.portrait .home-card b { font-size: 52px; }
+body.portrait .home-card .hc-sub { font-size: 26px; text-align: left; }
+body.portrait .home-card .hc-inner { align-items: flex-start; }
+
+/* ---- flow: one question, big cards */
+body[data-section='Subject'],
+body[data-section='Difficulty'] { --bg1: #ffb457; }
+.choice { justify-content: flex-start; }
+.hub-spacer { width: 120px; }
+.choice-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; margin-top: 40px; }
+.choice-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 330px;
+  padding: 22px 20px 24px;
+  border: 7px solid var(--ink);
+  border-radius: 28px;
+  background: var(--cc);
+  box-shadow: 0 10px 0 var(--ink);
+  transition: transform 0.12s;
+}
+.choice-card b { font-size: 40px; }
+.choice-card .cc-sub { font-size: 19px; opacity: 0.8; text-align: center; line-height: 1.15; }
+.choice-card .cc-art { width: 140px; aspect-ratio: 4 / 3; border: 5px solid var(--ink); border-radius: 12px; overflow: hidden; }
+.choice-card.focus, .choice-card:hover { transform: translateY(-5px); }
+.choice-card.focus { outline: 6px solid var(--cream); outline-offset: 5px; }
+.choice-card.on::after { content: '●'; position: absolute; top: 6px; left: 14px; font-size: 20px; }
+body.portrait .choice-cards { flex-direction: column; align-items: center; gap: 20px; margin-top: 30px; }
+body.portrait .choice-card { width: 800px; flex-direction: row; text-align: left; padding: 18px 24px; gap: 24px; }
+body.portrait .choice-card b { font-size: 46px; }
+body.portrait .choice-card .cc-sub { font-size: 24px; text-align: left; }
+
+/* ---- Beat Tour: choose the part of the world */
+.world-cards {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-content: start;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 6px 4px 12px;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+.world-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 16px;
+  border: 6px solid var(--ink);
+  border-radius: 24px;
+  background: var(--sc);
+  box-shadow: 0 8px 0 var(--ink);
+  text-align: left;
+  transition: transform 0.12s;
+}
+.world-card:hover, .world-card.focus { transform: translateY(-4px); }
+.world-card.focus { outline: 5px solid var(--cream); outline-offset: 4px; }
+.wc-top { display: flex; flex-direction: column; }
+.wc-top b { font-size: 26px; line-height: 1.05; }
+.wc-top small { font-size: 16px; opacity: 0.75; }
+.wc-flags { display: flex; flex-wrap: wrap; gap: 4px; }
+.wc-flags .flag-img { width: 34px; height: 26px; border: 2px solid var(--ink); border-radius: 4px; }
+.wc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wc-foot .stars { font-size: 20px; color: var(--ink); text-shadow: none; }
+.wc-foot .stars i { font-style: normal; font-size: 0.75em; opacity: 0.6; }
+.wc-foot small { font-size: 15px; opacity: 0.75; }
+body.portrait .world-cards { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+body.portrait .wc-top b { font-size: 32px; }
+body.portrait .wc-flags .flag-img { width: 44px; height: 33px; }
+.chip.hot { background: var(--sun); }
