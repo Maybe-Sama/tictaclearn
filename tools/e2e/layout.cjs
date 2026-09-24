@@ -5,6 +5,10 @@
  * element whose content is wider than its box (scrollWidth > clientWidth) is
  * reported: country/capital tokens, the flag label and the prompt caption.
  * Runs in portrait and in landscape, because the stage swaps composition.
+ *
+ * Only the horizontal axis is checked, on purpose: several tokens carry an
+ * absolutely-positioned decoration (the ★ ink stamp is 90 px tall on a 52 px
+ * token) that overflows vertically by design.
  */
 
 const { Report, VIEWPORTS, launchBrowser, openGame, sleep, waitAudioRunning, walkToConcert } = require('./common.cjs');
@@ -12,7 +16,8 @@ const { Report, VIEWPORTS, launchBrowser, openGame, sleep, waitAudioRunning, wal
 /** Sub-pixel rounding tolerance, same slack the in-app `fitText` uses. */
 const SLACK_PX = 1;
 const SAMPLE_MS = 100;
-const PLAY_MS = 22000;
+/** Long enough to cross from the teaching intro into the groove. */
+const PLAY_MS = 32000;
 
 const SELECTORS = ['.tk:not(.drum)', '.flag-label.show', '.prompt-caption'];
 
@@ -33,10 +38,9 @@ function installSampler(cfg) {
         if (!el.clientWidth) continue;
         window.__e2eChecked++;
         const overW = el.scrollWidth - el.clientWidth;
-        const overH = el.scrollHeight - el.clientHeight;
-        if (overW <= cfg.slack && overH <= cfg.slack) continue;
+        if (overW <= cfg.slack) continue;
         const text = (el.textContent || '').trim().slice(0, 60);
-        const key = `${sel}|${text}|${overW > cfg.slack ? 'w' : 'h'}`;
+        const key = `${sel}|${text}`;
         if (seen.has(key)) continue;
         seen.add(key);
         overflows.push({
@@ -44,10 +48,7 @@ function installSampler(cfg) {
           text,
           scrollWidth: el.scrollWidth,
           clientWidth: el.clientWidth,
-          scrollHeight: el.scrollHeight,
-          clientHeight: el.clientHeight,
           overW,
-          overH,
           fontSize: getComputedStyle(el).fontSize,
         });
       }
@@ -81,7 +82,7 @@ async function runVariant(browser, rep, key, viewport) {
     rep.check(
       out.overflows.length === 0,
       `[${key}] ningún texto desborda su caja`,
-      out.overflows.slice(0, 10).map((o) => `${o.selector} «${o.text}» ${o.scrollWidth}x${o.scrollHeight} en ${o.clientWidth}x${o.clientHeight} (sobra ${Math.max(o.overW, o.overH)} px, ${o.fontSize})`),
+      out.overflows.slice(0, 10).map((o) => `${o.selector} «${o.text}» necesita ${o.scrollWidth} px y solo tiene ${o.clientWidth} px (sobran ${o.overW} px, ${o.fontSize})`),
     );
   } finally {
     await page.close();

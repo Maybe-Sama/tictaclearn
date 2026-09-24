@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:content": "node tools/e2e/content.cjs",
+    "verify:e2e": "node tools/e2e/runner.cjs flow timing layout",
+    "verify": "npm run typecheck && npm run build && node tools/e2e/runner.cjs --no-build"
   },
   "devDependencies": {
     "puppeteer": "^24.43.1",

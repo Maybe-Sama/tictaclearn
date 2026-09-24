@@ -148,12 +148,17 @@ export class ChallengeGenerator {
   }
 
   /** A pure-rhythm phrase: only drums, no flag. */
-  drumPhrase(beats: number, drumBeats: number[], o: { bpm: number; groove: GrooveId; section: GameState; scored?: boolean; demo?: boolean; events?: PhraseEvent[]; ghost?: boolean }): Phrase {
+  drumPhrase(
+    beats: number,
+    drumBeats: number[],
+    o: { bpm: number; groove: GrooveId; section: GameState; scored?: boolean; demo?: boolean; events?: PhraseEvent[]; ghost?: boolean; echo?: boolean; dropBeats?: number[]; label?: string },
+  ): Phrase {
     return {
-      label: `drums:${drumBeats.join(',')}`,
+      label: o.label ?? `drums:${drumBeats.join(',')}`,
       bpm: o.bpm,
       beats,
       groove: o.groove,
+      dropBeats: o.dropBeats,
       events: o.events ?? [],
       challenges: [
         {
@@ -165,10 +170,52 @@ export class ChallengeGenerator {
           hint: false,
           glowCorrect: false,
           ghost: !!o.ghost,
+          echo: !!o.echo,
           section: o.section,
         },
       ],
     };
+  }
+
+  /**
+   * Call and response: the band plays a four-beat pattern, you play it back.
+   * The call is a `demo` phrase, so the existing judge auto-plays it and
+   * ignores presses during it; the response is the same pattern, scored.
+   * Pure rhythm, no knowledge: it is the breather and the confidence beat.
+   */
+  echoPair(pattern: number[], o: { bpm: number; groove: GrooveId; section: GameState; first: boolean }): [Phrase, Phrase] {
+    const base = { bpm: o.bpm, groove: o.groove, section: o.section, echo: true };
+    const call = this.drumPhrase(4, pattern, {
+      ...base,
+      demo: true,
+      ghost: true,
+      scored: false,
+      label: `echo-call:${pattern.join(',')}`,
+      // The band thins out so the pattern is heard clean.
+      dropBeats: [1, 2, 3],
+      events: [
+        { type: 'call', beat: 0, on: true },
+        { type: 'call', beat: 3.9, on: false },
+        { type: 'text', beat: 0, text: o.first ? '¡ESCUCHA!' : '¡OTRA!', sub: o.first ? 'el planeta toca…' : undefined, style: 'top', beats: 3.6 },
+      ],
+    });
+    const answer = this.drumPhrase(4, pattern, {
+      ...base,
+      scored: true,
+      label: `echo-answer:${pattern.join(',')}`,
+      events: [{ type: 'text', beat: 0, text: '¡TÚ!', style: 'top', beats: 3.6 }],
+    });
+    return [call, answer];
+  }
+
+  /** Four-beat call patterns, easiest first. */
+  echoPattern(tier: number): number[] {
+    const byTier: number[][][] = [
+      [[0, 1, 2, 3], [0, 1, 1.5, 3]],
+      [[0, 0.5, 2, 3], [0, 1, 2, 2.5, 3], [0, 1, 1.5, 3]],
+      [[0, 1.5, 2, 3.5], [0, 0.5, 1, 2, 3], [0, 1, 2, 2.5, 3]],
+    ];
+    return this.rng.pick(byTier[Math.max(0, Math.min(2, tier))]);
   }
 
   private pickTargets(pool: LearningItem[], k: number): LearningItem[] {

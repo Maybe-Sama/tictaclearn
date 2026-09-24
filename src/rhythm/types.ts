@@ -15,6 +15,7 @@ export type PhraseEvent =
   | { type: 'clear'; beat: number }
   | { type: 'cover'; beat: number }
   | { type: 'cue'; beat: number; kind: CueKind }
+  | { type: 'call'; beat: number; on: boolean }
   | { type: 'jingle'; beat: number; kind: JingleKind; n?: number }
   | { type: 'riser'; beat: number; beats: number }
   | { type: 'confetti'; beat: number }
@@ -48,6 +49,8 @@ export interface ChallengeSpec {
   glowCorrect: boolean;
   /** Drums drawn as outlines only: feel them. */
   ghost: boolean;
+  /** Part of a call-and-response round (the band plays, then you repeat). */
+  echo?: boolean;
   section: GameState;
 }
 

@@ -270,6 +270,11 @@ export class Stage {
     b.setAttribute('aria-label', on ? 'Voz activada' : 'Voz desactivada');
   }
 
+  /** During a call the planet is the one playing: it drums, you listen. */
+  setCalling(on: boolean): void {
+    this.dj.classList.toggle('calling', on);
+  }
+
   /** Override the HUD pill text (Beat Tour: stage + concert). */
   setPill(text: string): void {
     this.sectionName.textContent = text;

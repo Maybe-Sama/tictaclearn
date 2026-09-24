@@ -126,7 +126,7 @@ if (require.main === module) {
     run();
     console.log('\ncontent: OK');
   } catch (e) {
-    console.error(`\ncontent: ${e.message}`);
+    console.error(`\n${e.message}`);
     process.exit(1);
   }
 }

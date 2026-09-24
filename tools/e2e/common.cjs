@@ -133,9 +133,11 @@ async function clickVisible(page, selector, timeout = 15000) {
 /**
  * Menu walk shared by every browser test:
  * inicio → Beat Tour → asignatura → zona → concierto → jugando.
+ * `concert` picks which stop to open: the first one teaches new countries,
+ * `.stop.final` drops straight into the groove (denser for timing/layout).
  * Returns the ordered list of states visited, so `flow.cjs` can assert it.
  */
-async function walkToConcert(page, { subject = 'flags' } = {}) {
+async function walkToConcert(page, { subject = 'flags', concert = '.stop' } = {}) {
   const visited = [await state(page)];
   await page.waitForSelector('.menu:not(.hidden) .btn-tour', { visible: true, timeout: 15000 });
 
@@ -150,9 +152,9 @@ async function walkToConcert(page, { subject = 'flags' } = {}) {
   await page.waitForSelector('.hub.tour:not(.hidden) .world-card', { visible: true, timeout: 15000 });
   await clickVisible(page, '.hub.tour:not(.hidden) .world-card');
 
-  await page.waitForSelector('.hub.tour:not(.hidden) .stop', { visible: true, timeout: 15000 });
+  await page.waitForSelector(`.hub.tour:not(.hidden) ${concert}`, { visible: true, timeout: 15000 });
   visited.push('Zona');
-  await clickVisible(page, '.hub.tour:not(.hidden) .stop');
+  await clickVisible(page, `.hub.tour:not(.hidden) ${concert}`);
 
   await page.waitForFunction(
     () => {

@@ -321,7 +321,7 @@ export class Setlist implements PhraseSource {
       allowFlash: P.flash,
       allowDouble: P.double,
       ghostChance: Math.max(P.ghost, this.diff.ghost),
-      drumBreak: pl.final,
+      drumBreak: true,
       maxTier: P.maxTier,
       firstEvents: [{ type: 'section', beat: 0, state: playState, label: pl.pill }],
     });
@@ -347,11 +347,17 @@ export class Setlist implements PhraseSource {
 
       if (!breakDone && used >= o.budget * 0.45) {
         breakDone = true;
-        used += 8;
-        yield this.cg.drumPhrase(8, this.rng.pick([[0, 1, 1.5, 2, 3, 4, 4.5, 5, 6, 6.5, 7], [0, 0.5, 1, 2, 2.5, 3, 4, 5, 5.5, 6, 7], [0, 1, 2, 2.5, 3, 3.5, 4, 5, 6, 7]]), {
-          ...base,
-          events: [...firstEvents, { type: 'text', beat: 0, text: '¡SOLO DE TAMBOR!', style: 'top', beats: 7.5 }],
-        });
+        used += 16;
+        // Two rounds of call and response: the breather of the concert, and the
+        // only moment where rhythm is the content instead of the wrapper.
+        for (let round = 0; round < 2; round++) {
+          const first = round === 0 && !this.introduced.has('echo');
+          const [call, answer] = this.cg.echoPair(this.cg.echoPattern(round === 0 ? Math.min(tier, 1) : tier), { ...base, first });
+          if (round === 0 && firstEvents.length) call.events.push(...firstEvents);
+          this.introduced.add('echo');
+          yield call;
+          yield answer;
+        }
         continue;
       }
 

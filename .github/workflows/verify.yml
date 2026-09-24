@@ -1,0 +1,34 @@
+name: Verify
+
+# Safety net for timing and layout regressions. Independent from the Pages
+# deploy workflow: this one never publishes anything.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      # `npm ci` also downloads the Chromium that puppeteer pins, so the
+      # browser tests need no extra setup step.
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run verify

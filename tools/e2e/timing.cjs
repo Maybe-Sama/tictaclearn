@@ -19,7 +19,9 @@ const { Report, VIEWPORTS, launchBrowser, openGame, sleep, waitAudioRunning, wal
 /** A drum is considered off its beat above this. Measured by hand at < 1 ms. */
 const MAX_DEVIATION_MS = 1;
 const CPU_THROTTLE_RATE = 4;
-const PLAY_MS = 25000;
+const PLAY_MS = 30000;
+/** A run this short still schedules ~20 drums; below this the test is meaningless. */
+const MIN_SAMPLES = 15;
 
 /**
  * Installed with `evaluateOnNewDocument`, so no drum can slip through before
@@ -104,7 +106,9 @@ async function run() {
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE_RATE });
       rep.ok(`CPU emulada al ${Math.round(100 / CPU_THROTTLE_RATE)} % (rate ${CPU_THROTTLE_RATE})`);
 
-      await walkToConcert(page);
+      // The GRAN FINAL of a stage skips the teaching intro: straight into a
+      // dense groove, which is where the drum line is under the most pressure.
+      await walkToConcert(page, { concert: '.stop.final' });
       await waitAudioRunning(page);
       await sleep(PLAY_MS);
 
@@ -119,7 +123,9 @@ async function run() {
       const matched = data.drums.filter((d) => d.deltaMs !== null);
       const orphans = data.drums.length - matched.length;
 
-      rep.check(matched.length >= 20, `se midieron suficientes tambores (${matched.length})`, [
+      // Floor, not a target: a concert of this length yields ~20 drums. Zero (or a
+      // handful) would mean the run never really played and the test proved nothing.
+      rep.check(matched.length >= MIN_SAMPLES, `se midieron suficientes tambores (${matched.length})`, [
         `muestras totales: ${data.drums.length}, sin ficha cercana: ${orphans}`,
         'si son 0, el bot o el generador de retos no está produciendo tambores',
       ]);

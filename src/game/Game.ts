@@ -504,6 +504,7 @@ export class Game {
       bestStreak: this.stats.bestPerfectStreak,
       fevers: this.stats.feverCount,
       newBest,
+      echo: { rounds: this.stats.echoRounds, clean: this.stats.echoClean },
       mastered: this.tracker.mastered().map((s) => byId(s.id)),
       weak: this.tracker.weakest(3).map((s) => byId(s.id)),
     });
@@ -770,6 +771,10 @@ export class Game {
 
   /** Feed the learning model once a challenge is fully over. */
   private onResolved(c: Challenge, now: number): void {
+    if (c.spec.echo && c.scored && !c.demo) {
+      this.stats.echoRounds++;
+      if (c.options.every((o) => o.state === 'hit')) this.stats.echoClean++;
+    }
     if (!c.scored || c.demo) return;
     // Mashing is not "knowing it": more presses than tokens (+1 slack) counts as a guess.
     const mashed = c.presses > c.options.filter((o) => o.correct).length + 1;
@@ -863,6 +868,9 @@ export class Game {
         break;
       case 'cue':
         st.cue(ev.kind);
+        break;
+      case 'call':
+        st.setCalling(ev.on);
         break;
       case 'confetti':
         st.confetti();

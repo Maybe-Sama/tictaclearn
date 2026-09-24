@@ -25,6 +25,9 @@ export class SessionStats {
   noResponse = 0;
   stray = 0;
   lastWasHit = false;
+  /** Call-and-response rounds played and how many were clean. */
+  echoRounds = 0;
+  echoClean = 0;
   private timingPts = 0;
   private timingN = 0;
 

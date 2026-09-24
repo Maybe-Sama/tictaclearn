@@ -1809,3 +1809,27 @@ body.portrait .world-cards { grid-template-columns: repeat(2, 1fr); gap: 20px; }
 body.portrait .wc-top b { font-size: 32px; }
 body.portrait .wc-flags .flag-img { width: 44px; height: 33px; }
 .chip.hot { background: var(--sun); }
+
+/* ---- call and response: the planet is the one playing */
+.dj.calling { --planet: var(--pink); }
+.dj.calling .dj-body { animation: dj-drum 0.42s ease-in-out infinite; }
+.dj.calling::after {
+  content: '♪ ♫';
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 26px;
+  color: var(--cream);
+  text-shadow: var(--outline);
+  animation: dj-notes 0.8s ease-in-out infinite;
+}
+@keyframes dj-drum {
+  50% { transform: translateY(-10px) rotate(-6deg) scale(1.04); }
+}
+@keyframes dj-notes {
+  50% { transform: translate(-50%, -8px) rotate(6deg); opacity: 0.6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dj.calling .dj-body, .dj.calling::after { animation: none; }
+}
