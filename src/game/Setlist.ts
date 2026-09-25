@@ -1,6 +1,6 @@
 import type { ContentPack, LearningItem, LevelId } from '../content/types';
 import type { PhraseSource } from '../rhythm/RhythmEngine';
-import type { GrooveId, Phrase, PhraseEvent } from '../rhythm/types';
+import type { GrooveId, OptionSpec, Phrase, PhraseEvent } from '../rhythm/types';
 import { OFFBEAT_PATTERNS, TEMPLATES, type ChallengeGenerator, type DrumPattern, type TemplateId } from './ChallengeGenerator';
 import type { DifficultyDirector, DifficultySettings, Tier } from './Difficulty';
 import type { ConcertParams } from './Tour';
@@ -402,6 +402,34 @@ export class Setlist implements PhraseSource {
       events: [{ type: 'text', beat: 0, text: '¡DOBLE!', sub: 'dos banderas · dos golpes', style: 'top', beats: 11.5 }],
     });
     this.introduced.add('double');
+  }
+
+  /**
+   * The hold is demonstrated before it is ever asked for (twin of `doubleIntro`):
+   * the band sustains one on beat 2 so the player *sees* the bar fill and *hears*
+   * the long note, then plays the same hold on beat 6. Zero risk of failing the
+   * first one. Returns the phrases instead of yielding them, so the debug hook
+   * can queue it too.
+   */
+  holdIntro(bpm: number, groove: GrooveId, section: GameState): Phrase[] {
+    const hold = (beat: number): OptionSpec => ({ beat, kind: 'hold', correct: true, lenBeats: 2 });
+    const drums = (beats: number[]): OptionSpec[] => beats.map((b) => ({ beat: b, kind: 'drum', correct: true }));
+    const base = { targets: [], flagBeat: null, glowCorrect: false, ghost: false, section };
+    this.introduced.add('hold');
+    return [
+      {
+        label: 'hold-intro',
+        bpm,
+        beats: 8,
+        groove,
+        events: [{ type: 'text', beat: 0, text: '¡SOSTÉN!', sub: 'mantén ESPACIO mientras cruza', style: 'top', beats: 7.6 }],
+        challenges: [
+          { ...base, options: [...drums([0, 1]), hold(2)], demo: true, scored: false, hint: false },
+          { ...base, options: [...drums([4, 5]), hold(6)], demo: false, scored: true, hint: true },
+        ],
+      },
+      this.banner('AHORA TÚ', bpm, groove, 'go'),
+    ];
   }
 
   private announce(what: 'offbeat' | 'flash' | 'quick' | 'double'): PhraseEvent[] {

@@ -1,4 +1,4 @@
-export type Action = 'hit' | 'confirm' | 'back' | 'restart' | 'skip' | 'offsetUp' | 'offsetDown' | 'level2' | 'calibrate' | 'prev' | 'next' | 'up' | 'down' | 'level1' | 'free' | 'voice';
+export type Action = 'hit' | 'release' | 'confirm' | 'back' | 'restart' | 'skip' | 'offsetUp' | 'offsetDown' | 'level2' | 'calibrate' | 'prev' | 'next' | 'up' | 'down' | 'level1' | 'free' | 'voice';
 
 type Handler = (action: Action, timeStamp: number) => void;
 
@@ -43,9 +43,11 @@ export class Input {
         this.emit(a, e.timeStamp);
       }
     });
-    // Keep SPACE from "clicking" a focused button on keyup.
+    // Keep SPACE from "clicking" a focused button on keyup — and let go of a hold.
     window.addEventListener('keyup', (e) => {
-      if (e.code === 'Space') e.preventDefault();
+      if (e.code !== 'Space') return;
+      e.preventDefault();
+      this.emit('release', e.timeStamp);
     });
     // Touch / click on the stage = hit (mobile-ready).
     pointerArea.addEventListener('pointerdown', (e) => {
@@ -53,6 +55,11 @@ export class Input {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       this.emit('hit', e.timeStamp);
     });
+    // Lifting the finger releases a hold. `pointercancel` is not an edge case on
+    // iOS: the smallest drag steals the pointer, and that has to let go too.
+    const up = (e: PointerEvent): void => this.emit('release', e.timeStamp);
+    pointerArea.addEventListener('pointerup', up);
+    pointerArea.addEventListener('pointercancel', up);
   }
 
   on(h: Handler): void {

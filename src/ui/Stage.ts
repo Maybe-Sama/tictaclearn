@@ -25,6 +25,8 @@ interface Token {
   el: HTMLDivElement;
   tk: HTMLDivElement;
   detached: boolean;
+  /** Holds only: last state drawn, so the break / land transitions fire once. */
+  was?: string;
 }
 
 /**
@@ -89,6 +91,9 @@ export class Stage {
   private haloCtx: CanvasRenderingContext2D;
   private ringColor = 'rgba(255,255,255,0.28)';
   private feverAt = 30;
+  /** A hold is being sustained right now: the keycap stays down until it ends. */
+  private holdingNow = false;
+  private lastSpark = 0;
 
   constructor(
     host: HTMLElement,
@@ -181,6 +186,8 @@ export class Stage {
     this.root.classList.remove('fever-mode');
     document.body.classList.remove('fever-mode');
     this.hush = false;
+    this.holdingNow = false;
+    this.keycap.classList.remove('down');
   }
 
   /** Canvas rings instead of four huge composited DOM circles (phones ran out of GPU memory). */
@@ -298,12 +305,16 @@ export class Stage {
       }
     }
 
+    let holding = false;
     for (const c of engine.challenges) {
       for (const o of c.options) {
         const b = (o.time - now) / o.beatDur;
+        // A hold leaves the lane by its tail, not its head, or the end of the
+        // body would vanish while it is still being sustained.
+        const tail = b + o.lenBeats;
         let tok = this.tokens.get(o);
-        if (b > 3.7 || b < -2.3) {
-          if (tok && !tok.detached && b < -2.3) {
+        if (b > 3.7 || tail < -2.3) {
+          if (tok && !tok.detached && tail < -2.3) {
             tok.el.remove();
             tok.detached = true;
           }
@@ -314,6 +325,11 @@ export class Stage {
           this.tokens.set(o, tok);
         }
         if (tok.detached) continue;
+        if (o.kind === 'hold') {
+          if (o.state === 'holding') holding = true;
+          this.renderHold(o, tok, b, tail, now);
+          continue;
+        }
         const h = hop(b, this.reduced, o.offbeat);
         const x = L.padX + L.spacing * h.pos;
         const y = L.laneY - HOP_HEIGHT * h.lift;
@@ -324,11 +340,49 @@ export class Stage {
         tok.el.style.opacity = op.toFixed(3);
       }
     }
+    if (holding !== this.holdingNow) {
+      this.holdingNow = holding;
+      this.keycap.classList.toggle('down', holding);
+    }
+    if (holding && now - this.lastSpark > 0.12) {
+      this.lastSpark = now;
+      this.fx.burst(L.padX, L.laneY - 10, { n: 1, shape: 'dot', speed: 220, size: 8, life: 0.3 });
+    }
     for (const [o, tok] of this.tokens) {
-      if (now - o.time > 4) {
+      if (now - o.endTime > 4) {
         tok.el.remove();
         this.tokens.delete(o);
       }
+    }
+  }
+
+  /**
+   * A sustained note *slides*: a 3-beat bar hopping would read as a rendering
+   * bug, and the contrast with the tokens that do hop is free signposting.
+   */
+  private renderHold(o: ChallengeOption, tok: Token, b: number, tail: number, now: number): void {
+    const x = L.padX + L.spacing * b;
+    const op = b > 3.2 ? (3.7 - b) / 0.5 : tail < -1.5 ? Math.max(0, (tail + 2.3) / 0.8) : 1;
+    tok.el.style.transform = `translate3d(${x.toFixed(1)}px, ${L.laneY.toFixed(1)}px, 0) translate(0, -50%)`;
+    tok.el.style.opacity = op.toFixed(3);
+    const st = o.state;
+    if (st === 'holding') {
+      const k = (now - o.time) / Math.max(0.001, o.endTime - o.time);
+      tok.tk.style.setProperty('--fill', Math.max(0, Math.min(1, k)).toFixed(3));
+    }
+    if (st === tok.was) return;
+    tok.was = st;
+    if (st === 'holding') tok.tk.classList.add('live');
+    else if (st === 'hit') {
+      // The tail pops like a stamped token and throws the full star burst.
+      tok.tk.style.setProperty('--fill', '1');
+      tok.tk.classList.remove('live');
+      tok.tk.classList.add('done');
+      this.fx.burst(L.padX, L.laneY - 20, { n: 14, shape: 'star', speed: 620, size: 16 });
+      tok.tk.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.12, .84)', offset: 0.25 }, { transform: 'scale(1)' }], { duration: 260, easing: 'ease-out' });
+    } else if (st === 'broken' || st === 'missed') {
+      tok.tk.classList.remove('live');
+      tok.tk.classList.add('broken');
     }
   }
 
@@ -336,7 +390,12 @@ export class Stage {
     const el = document.createElement('div');
     el.className = 'token';
     const tk = document.createElement('div');
-    if (o.kind === 'drum') {
+    if (o.kind === 'hold') {
+      el.className = 'token hold';
+      el.style.setProperty('--len', String(o.lenBeats));
+      tk.className = `tk hold${o.challenge.spec.ghost ? ' ghost' : ''}`;
+      tk.innerHTML = '<i class="hold-head"></i><b class="hold-body"></b><i class="hold-tail"></i>';
+    } else if (o.kind === 'drum') {
       tk.className = `tk drum${o.offbeat ? ' off' : ''}${o.bell ? ' bell' : ''}${o.challenge.spec.ghost ? ' ghost' : ''}`;
       tk.innerHTML = `<span class="drum-face">${o.offbeat ? 'y' : ''}</span>`;
     } else {
@@ -513,13 +572,36 @@ export class Stage {
     }
     this.keycap.animate([{ transform: 'translate(-50%, 0)' }, { transform: 'translate(-50%, 8px)', offset: 0.3 }, { transform: 'translate(-50%, 0)' }], { duration: 180 });
     this.keycap.classList.add('down');
-    window.setTimeout(() => this.keycap.classList.remove('down'), 120);
+    // A hold keeps it down for its whole body; `render()` owns that case.
+    window.setTimeout(() => {
+      if (!this.holdingNow) this.keycap.classList.remove('down');
+    }, 120);
   }
 
   feedback(j: Judgement): void {
     if (j.kind === 'whiff') return;
     const o = j.option;
     const tok = o ? this.tokens.get(o) : undefined;
+
+    if (o?.kind === 'hold') {
+      // The token itself is driven by its state in `render()`; this is only the read-out.
+      this.miniJudge.textContent = j.grade === 'miss' ? '¡SE ROMPIÓ!' : j.grade === 'perfect' ? 'PERFECT' : 'GOOD';
+      this.miniJudge.className = `mini-judge ${j.grade}`;
+      this.miniJudge.getAnimations().forEach((a) => a.cancel());
+      this.miniJudge.animate(
+        [
+          { transform: 'translate(-50%, 0) scale(.6)', opacity: 0 },
+          { transform: 'translate(-50%, -8px) scale(1.1)', opacity: 1, offset: 0.25 },
+          { transform: 'translate(-50%, -26px) scale(1)', opacity: 0 },
+        ],
+        { duration: 420, easing: 'ease-out', fill: 'forwards' },
+      );
+      if (j.grade !== 'miss') {
+        this.pad.animate([{ transform: 'translate(-50%,-50%) scale(1.2)' }, { transform: 'translate(-50%,-50%) scale(1)' }], { duration: 220, easing: 'ease-out' });
+        this.flagBob();
+      } else this.flagReact('huh');
+      return;
+    }
 
     if (j.drum) {
       this.drumFeedback(j, tok);

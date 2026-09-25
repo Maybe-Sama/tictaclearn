@@ -969,6 +969,102 @@ body[data-section='FinalGroove'] .banner.title::before { background: repeating-l
 .tk.drum.ghost .drum-face { opacity: 0.35; }
 .tk.drum.missed { filter: grayscale(1); opacity: 0.45; }
 
+/* ---- hold tokens: press the head, keep pressing, let go on the tail.
+   The head is a drum-sized circle ("press here"), the body says "this lasts",
+   the bevelled tail says "let go here". Anchored by its head, so the token box
+   grows to the right: see Stage.renderHold (translate(0, -50%), no hop). */
+.tk.hold {
+  --fill: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  max-width: none;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  margin-left: -44px;
+}
+.hold-head {
+  flex: none;
+  width: 88px;
+  height: 88px;
+  border: 6px solid var(--ink);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, #fff7e6 0 38%, var(--pink) 39%);
+  box-shadow: 0 7px 0 var(--ink);
+  position: relative;
+  z-index: 2;
+}
+.hold-body {
+  position: relative;
+  flex: none;
+  /* Half the head (44px) plus half the tail (18px) already spans 62px. */
+  width: calc(var(--spacing) * var(--len) - 42px);
+  height: 54px;
+  margin: 0 -10px;
+  border: 6px solid var(--ink);
+  background-color: #fff7e6;
+  background-image: repeating-linear-gradient(115deg, rgba(36, 22, 67, 0.18) 0 14px, transparent 14px 34px);
+  background-size: 68px 100%;
+  box-shadow: 0 7px 0 var(--ink);
+  overflow: hidden;
+  animation: hold-stripes 1.6s linear infinite;
+}
+@keyframes hold-stripes {
+  to { background-position: 68px 0; }
+}
+/* Fills from the head while you sustain it. */
+.hold-body::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--fill) * 100%);
+  background: var(--teal);
+}
+.hold-tail {
+  flex: none;
+  width: 36px;
+  height: 54px;
+  border: 6px solid var(--ink);
+  border-left: none;
+  border-radius: 0 24px 24px 0;
+  background: var(--pink);
+  box-shadow: 6px 7px 0 var(--ink);
+  position: relative;
+  z-index: 2;
+}
+.tk.hold.live .hold-head { background: radial-gradient(circle at 50% 42%, #fff7e6 0 38%, var(--teal) 39%); }
+.tk.hold.live .hold-tail { background: #c9f3e9; }
+.tk.hold.live .hold-body { background-color: #fffdf6; }
+.tk.hold.done .hold-head,
+.tk.hold.done .hold-tail { background: var(--teal); }
+.tk.hold.done .hold-body { animation: none; background-color: var(--teal); }
+/* Broken: the rest of the body shears away from the head and goes grey. */
+.tk.hold.broken { filter: grayscale(1); opacity: 0.5; }
+.tk.hold.broken .hold-body {
+  transform-origin: left center;
+  animation: hold-snap 0.18s ease-in forwards;
+}
+.tk.hold.broken .hold-tail { opacity: 0; transition: opacity 0.18s ease-in; }
+@keyframes hold-snap {
+  to { transform: scaleX(0); }
+}
+.tk.hold.ghost .hold-head,
+.tk.hold.ghost .hold-tail {
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+}
+.tk.hold.ghost .hold-body {
+  background-color: transparent;
+  border-style: dashed;
+  box-shadow: none;
+}
+
 .mini-judge {
   position: absolute;
   left: calc(var(--pad-x) + 180px);

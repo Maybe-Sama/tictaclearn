@@ -25,8 +25,9 @@ export type PhraseEvent =
 /**
  * 'answer' = a country name: hit it only if it matches the flag.
  * 'drum'   = a drum: always hit it, on time. Keeps the hands busy and the groove alive.
+ * 'hold'   = a long token: press on its head, keep pressing, release on its tail.
  */
-export type OptionKind = 'answer' | 'drum';
+export type OptionKind = 'answer' | 'drum' | 'hold';
 
 export interface OptionSpec {
   beat: number;
@@ -35,6 +36,8 @@ export interface OptionSpec {
   correct: boolean;
   /** Drum variant with a cowbell voice (double-hit cue). */
   bell?: boolean;
+  /** 'hold' only: how many beats the body lasts (2 or 3). */
+  lenBeats?: number;
 }
 
 export interface ChallengeSpec {
@@ -80,7 +83,12 @@ export interface ScheduledPhrase {
   index: number;
 }
 
-export type OptionState = 'pending' | 'hit' | 'wrong' | 'missed' | 'passed';
+export type OptionState = 'pending' | 'hit' | 'wrong' | 'missed' | 'passed' | 'holding' | 'broken';
+
+/** Handle on a sustained note, so a broken hold can be cut off mid-flight. */
+export interface SoundHandle {
+  cut(at: number): void;
+}
 
 export interface ChallengeOption {
   challenge: Challenge;
@@ -96,8 +104,16 @@ export interface ChallengeOption {
   beatDur: number;
   state: OptionState;
   judgement?: Judgement;
+  /** 0 for everything but a hold: beats between its head and its tail. */
+  lenBeats: number;
+  /** Where the tail lands: `time + lenBeats * beatDur` (equals `time` when not a hold). */
+  endTime: number;
+  /** How the release was graded (holds only). */
+  releaseJudgement?: Judgement;
   /** Its drum sound was scheduled ahead, exactly on the beat (player in the groove). */
   prePlayed?: boolean;
+  /** The sustained voice of a hold, kept so a break can cut it. */
+  audio?: SoundHandle;
 }
 
 export interface Challenge {

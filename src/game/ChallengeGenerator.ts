@@ -39,8 +39,12 @@ export const TEMPLATES: Record<TemplateId, Template> = {
   quick: { beats: 4, flagBeat: 0, answerBeats: [2, 3], targets: 1 },
 };
 
-/** Drum lead-ins, in beats relative to the first country name. */
-export type DrumPattern = 'none' | 'basic' | 'pickup' | 'sync' | 'gallop' | 'offbeats' | 'triple';
+/**
+ * Drum lead-ins, in beats relative to the first country name. `holdRead` is the
+ * odd one out: it has no drums at all, because a single HOLD takes their place
+ * (see `holdLen`). Reading time, turned into action.
+ */
+export type DrumPattern = 'none' | 'basic' | 'pickup' | 'sync' | 'gallop' | 'offbeats' | 'triple' | 'holdRead';
 const DRUMS: Record<DrumPattern, number[]> = {
   none: [],
   basic: [-2, -1],
@@ -49,8 +53,20 @@ const DRUMS: Record<DrumPattern, number[]> = {
   gallop: [-4, -3, -2.5, -2, -1],
   offbeats: [-4, -3.5, -2.5, -1.5, -1],
   triple: [-2, -1.5, -1],
+  holdRead: [],
 };
 export const OFFBEAT_PATTERNS = new Set<DrumPattern>(['sync', 'gallop', 'offbeats']);
+
+/**
+ * Hold length for a template: from the flag beat to one beat before the first
+ * name. 2 or 3 beats only — one beat cannot be told apart from a tap, and 4+
+ * tires the hand and covers the band. 0 = this template takes no hold.
+ */
+export function holdLen(tid: TemplateId): number {
+  const tpl = TEMPLATES[tid];
+  const len = tpl.answerBeats[0] - 1 - tpl.flagBeat;
+  return len >= 2 ? Math.min(3, len) : 0;
+}
 
 export interface ChallengeOptions {
   pool: LearningItem[];
@@ -110,7 +126,13 @@ export class ChallengeGenerator {
       options.push({ beat: tpl.answerBeats[i], kind: 'answer', item: ci >= 0 ? targets[ci] : distractors[d++], correct: ci >= 0 });
     }
     const first = tpl.answerBeats[0];
-    const pattern = o.drums ?? 'basic';
+    // `quick` has only one beat of reading room, so it falls back to drums.
+    const holdBeats = o.drums === 'holdRead' ? holdLen(tid) : 0;
+    const pattern = holdBeats ? 'holdRead' : o.drums === 'holdRead' ? 'basic' : (o.drums ?? 'basic');
+    if (holdBeats) {
+      // The hold owns (flagBeat, flagBeat + holdBeats] on its own: nothing else lands there.
+      options.push({ beat: tpl.flagBeat, kind: 'hold', correct: true, lenBeats: holdBeats });
+    }
     for (const rel of DRUMS[pattern]) {
       const b = first + rel;
       if (b >= 0) options.push({ beat: b, kind: 'drum', correct: true, bell: pattern === 'triple' });

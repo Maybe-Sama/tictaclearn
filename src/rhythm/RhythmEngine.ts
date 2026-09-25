@@ -196,7 +196,25 @@ export class RhythmEngine {
     spec.options.forEach((o, i) => {
       const time = sp.start + o.beat * sp.beatDur;
       const offbeat = Math.abs(o.beat - Math.round(o.beat)) > 0.01;
-      c.options.push({ challenge: c, index: i, kind: o.kind, item: o.item, correct: o.correct, bell: !!o.bell, offbeat, beat: o.beat, time, beatDur: sp.beatDur, state: 'pending' });
+      const lenBeats = o.kind === 'hold' ? (o.lenBeats ?? 2) : 0;
+      c.options.push({ challenge: c, index: i, kind: o.kind, item: o.item, correct: o.correct, bell: !!o.bell, offbeat, beat: o.beat, time, beatDur: sp.beatDur, state: 'pending', lenBeats, endTime: time + lenBeats * sp.beatDur });
+      if (o.kind === 'hold') {
+        const opt = c.options[c.options.length - 1];
+        const dur = lenBeats * sp.beatDur;
+        // Same pre-scheduling policy as the drums: an input-triggered sustain
+        // would start one output-latency late, which is very audible on phones.
+        this.pushAudio(time, (tt) => {
+          const v = spec.demo ? 1 : this.prePlay(opt);
+          if (v > 0) opt.audio = this.audio.holdNote(tt, dur, 36 + this.mix.transpose + 12);
+        });
+        // Sixteenths under the note: this is what the ear reads as "still holding".
+        for (let k = 1; k * 0.25 < lenBeats; k++) {
+          this.pushAudio(time + (k * sp.beatDur) / 4, (tt) => {
+            if (opt.state === 'holding' || opt.state === 'pending') this.audio.shaker(tt, 0.05);
+          });
+        }
+        return;
+      }
       if (o.kind === 'drum') {
         c.drumCount++;
         // Quiet guide so the drum line stays audible even when you miss it.

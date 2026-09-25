@@ -3,8 +3,8 @@ import { rollSong, BAND_NAMES, type MusicMix } from '../audio/Music';
 import type { ContentPack, LearningItem } from '../content/types';
 import type { Action } from '../input/Input';
 import { Judge } from '../rhythm/Judge';
-import { RhythmEngine } from '../rhythm/RhythmEngine';
-import type { Challenge, ChallengeOption, Judgement, TimedVisual } from '../rhythm/types';
+import { RhythmEngine, type PhraseSource } from '../rhythm/RhythmEngine';
+import type { Challenge, ChallengeOption, Judgement, Phrase, TimedVisual } from '../rhythm/types';
 import type { DebugPanel } from '../ui/Debug';
 import type { Particles } from '../ui/Particles';
 import type { CalibrationScreen, Menu, PauseOverlay, ResultsData, ResultsScreen } from '../ui/Screens';
@@ -14,10 +14,10 @@ import { preloadFlags } from '../content/flags';
 import { setVoice, silence, voiceEnabled } from '../util/voice';
 import { Rng, randomSeed } from '../util/rng';
 import { Progress } from './Progress';
-import { buildTour, nextConcert, starsFor, type ConcertDef, type StageDef } from './Tour';
+import { buildTour, nextConcert, starsFor, type ArchetypeId, type ConcertDef, type StageDef } from './Tour';
 import type { Stage } from '../ui/Stage';
 import { loadBest, loadDifficulty, loadOffset, loadSubject, saveBest, saveDifficulty, saveOffset, saveSubject } from '../util/storage';
-import { ChallengeGenerator } from './ChallengeGenerator';
+import { ChallengeGenerator, type TemplateId } from './ChallengeGenerator';
 import { DIFFICULTIES, DIFFICULTY_ORDER, DifficultyDirector, type DifficultyId, type DifficultySettings } from './Difficulty';
 import { GameState, GameStateMachine, PLAYING_STATES } from './GameStateMachine';
 import { LearningTracker, type Outcome } from './LearningTracker';
@@ -85,6 +85,11 @@ export class Game {
   private resultsShownAt = 0;
   private lastFrame = performance.now();
   private practiceStep = 0;
+  /** True between 'hit' and 'release': the only state a hold needs from the input layer. */
+  private keyDown = false;
+  private cg: ChallengeGenerator | null = null;
+  /** ?debug=1 only: phrases injected before the setlist's own (see `debugHold`). */
+  private debugQueue: Phrase[] = [];
   private bot: Bot | null = null;
   private calib: Calib | null = null;
   private mode: Mode = { kind: 'beat', level: 1 };
@@ -371,13 +376,27 @@ export class Game {
     const tracker = new LearningTracker(pool, this.rng.fork('tracker'));
     tracker.boost(ids.filter((id) => this.progress.level(P, id) === 'aprendiendo'));
     const n = pool.length;
+    const arch: ArchetypeId = n < 8 ? 'escuela' : n > 15 ? 'jefe' : this.rng.fork('archetype').chance(0.5) ? 'eco' : 'memoria';
     const plan: SessionPlan = {
       title: 'BEAT LIBRE',
       sub: `${n} ${this.pack.noun}`,
       pill: 'BEAT LIBRE',
       newItems,
       pool,
-      params: { bpm: 104, groove: 'mix', maxTier: 2, quick: true, flash: true, double: true, ghost: 0, budget: Math.max(56, Math.min(112, 40 + 4 * n)) },
+      params: {
+        // Beat Libre borrows an archetype from the size of the set (docs §3.4, point 7).
+        archetype: arch,
+        bpm: 104,
+        groove: 'mix',
+        maxTier: arch === 'escuela' ? 1 : 2,
+        quick: arch !== 'escuela',
+        flash: arch === 'memoria' || arch === 'jefe',
+        double: arch === 'jefe',
+        ghost: arch === 'memoria' ? 0.6 : 0,
+        hold: arch === 'memoria' || arch === 'jefe',
+        echo: arch === 'eco' || arch === 'jefe',
+        budget: Math.max(56, Math.min(112, 40 + 4 * n)),
+      },
       final: n >= 12,
       depth: 0.6,
     };
@@ -405,9 +424,13 @@ export class Game {
     Object.assign(this.mix, rollSong(this.rng.fork('music')));
     this.dd = new DifficultyDirector(this.diff, this.deterministic);
     const cg = new ChallengeGenerator(this.tracker, this.pack.items, this.rng.fork('challenges'));
+    this.cg = cg;
     this.setlist = new Setlist(this.pack, cg, this.dd, this.diff, this.rng.fork('setlist'), opts);
     if (this.bot) this.bot.rng = this.rng.fork('bot');
-    this.engine = new RhythmEngine(a, this.setlist, this.mix);
+    this.debugQueue = [];
+    this.keyDown = false;
+    const source: PhraseSource = this.opts.debug ? { next: (t) => this.debugQueue.shift() ?? this.setlist!.next(t) } : this.setlist;
+    this.engine = new RhythmEngine(a, source, this.mix);
     this.engine.prePlay = (o) => this.inGroove(o);
     this.judge = new Judge(this.engine, this.diff.windows);
     this.ui.stage.setFeverAt(this.diff.feverAt);
@@ -505,11 +528,33 @@ export class Game {
       fevers: this.stats.feverCount,
       newBest,
       echo: { rounds: this.stats.echoRounds, clean: this.stats.echoClean },
+      hold: { total: this.stats.holdsTotal, clean: this.stats.holdsClean },
       mastered: this.tracker.mastered().map((s) => byId(s.id)),
       weak: this.tracker.weakest(3).map((s) => byId(s.id)),
     });
     this.resultsShownAt = performance.now();
     if (this.opts.debug) console.table(all.map(({ history, confusedWith, ...s }) => ({ ...s, history: history.join(','), confusedWith: JSON.stringify(confusedWith) })));
+  }
+
+  /**
+   * ?debug=1 hook: queues the hold tutorial plus one phrase whose drum pattern
+   * is a HOLD, so the primitive can be exercised while no concert emits one yet.
+   * `window.__wb.debugHold(2 | 3)`. Returns false if there is no song running.
+   */
+  debugHold(lenBeats = 3): boolean {
+    if (!this.opts.debug || !this.playing || !this.setlist || !this.cg || !this.engine) return false;
+    const last = this.engine.phrases[this.engine.phrases.length - 1];
+    const bpm = last?.phrase.bpm ?? 104;
+    const groove = last?.phrase.groove ?? 'mix';
+    const section = this.fsm.state;
+    // `rapid` reads the flag in 3 beats (hold of 2), `four` in 4 (hold of 3).
+    const tid: TemplateId = lenBeats <= 2 ? 'rapid' : 'four';
+    const pool = this.tracker.all().map((s) => this.pack.byId(s.id));
+    this.debugQueue.push(
+      ...this.setlist.holdIntro(bpm, groove, section),
+      this.cg.challengePhrase(tid, { pool, drums: 'holdRead', hint: true, bpm, groove, section }),
+    );
+    return true;
   }
 
   /** Nudge players toward the difficulty that fits them. */
@@ -601,6 +646,9 @@ export class Game {
   // ------------------------------------------------------------------ input
 
   onAction(action: Action, ts: number): void {
+    // Tracked before any early return, or a release outside play would leave a hold stuck down.
+    if (action === 'hit') this.keyDown = true;
+    else if (action === 'release') this.keyDown = false;
     const s = this.fsm.state;
     if (s === GameState.Subject || s === GameState.Difficulty) {
       if (action === 'back') this.choiceBack();
@@ -651,6 +699,9 @@ export class Game {
       case 'hit':
         this.onHit(ts);
         break;
+      case 'release':
+        this.onRelease(ts);
+        break;
       case 'back':
         this.pause();
         break;
@@ -674,9 +725,20 @@ export class Game {
 
   private onHit(ts: number): void {
     if (!this.audio || !this.playing) return;
+    this.pressAt(this.heard(ts));
+  }
+
+  /** Letting go of a hold. Same clock conversion as `onHit()`, never judged as a press. */
+  private onRelease(ts: number): void {
+    if (!this.audio || !this.judge || !this.playing || this.paused) return;
+    for (const j of this.judge.release(this.heard(ts))) this.applyHold(j);
+  }
+
+  /** Event timestamp → heard clock, with the manual calibration taken out. */
+  private heard(ts: number): number {
     const pn = performance.now();
     const evTs = ts > 0 && Math.abs(pn - ts) < 1000 ? ts : pn;
-    this.pressAt(this.audio.heardTime(evTs) - this.audio.inputOffsetMs / 1000);
+    return this.audio!.heardTime(evTs) - this.audio!.inputOffsetMs / 1000;
   }
 
   /** inputTime is on the heard clock, directly comparable to scheduled beat times. */
@@ -734,8 +796,9 @@ export class Game {
       } else step = this.practiceStep++;
       const at = this.soundTime(j);
       if (j.drum) {
-        // Already pre-scheduled on the beat if you were in the groove.
-        if (!j.option?.prePlayed) a.drumHit(at, !!j.option?.offbeat, !!j.option?.bell, j.grade === 'perfect' ? 1 : 0.7);
+        // Already pre-scheduled on the beat if you were in the groove. A hold's own
+        // sustained voice is always pre-scheduled, so it never wants a drum on top.
+        if (!j.option?.prePlayed && j.option?.kind !== 'hold') a.drumHit(at, !!j.option?.offbeat, !!j.option?.bell, j.grade === 'perfect' ? 1 : 0.7);
         if (scored) this.dd.recordDrum(true);
       } else if (j.grade === 'perfect') a.perfect(at, step);
       else a.good(at, step);
@@ -769,11 +832,76 @@ export class Game {
     st.feedback(j);
   }
 
+  /**
+   * The tail of a hold: either a valid release or a break. Kept apart from
+   * `apply()` because a hold is scored twice (head and tail) but can only ever
+   * be penalised once — the head already left 'pending', so nothing re-judges it.
+   */
+  private applyHold(j: Judgement): void {
+    const a = this.audio!;
+    const now = a.ctx.currentTime;
+    const st = this.ui.stage;
+    const o = j.option!;
+    const scored = !!j.challenge?.scored;
+
+    if (j.grade !== 'miss') {
+      let step: number;
+      if (scored) {
+        const ev = this.stats.hit(j.grade, true);
+        // The body is the reward: longer sustain, bigger bonus.
+        this.stats.score += 20 * o.lenBeats;
+        step = this.stats.combo - 1;
+        if (ev.feverStart) {
+          a.feverOn(now);
+          st.setFever(true);
+        }
+        if (ev.streak) {
+          a.streak(now);
+          st.streak(ev.streak);
+        }
+        this.dd.recordDrum(true);
+      } else step = this.practiceStep++;
+      const at = Math.max(now, o.endTime);
+      if (j.grade === 'perfect') a.perfect(at, step);
+      else a.good(at, step);
+      if (o.lenBeats >= 3) a.crash(at, 0.12);
+      st.feedback(j);
+      if (scored) {
+        st.setCombo(this.stats.combo);
+        st.setScore(this.stats.score);
+        this.updateMix();
+      }
+      return;
+    }
+
+    o.audio?.cut(now);
+    a.drumMiss(now);
+    a.dip();
+    if (scored) {
+      const lostFever = this.stats.fail('rhythm');
+      this.dd.recordDrum(false);
+      if (lostFever) {
+        a.feverOff(now);
+        st.setFever(false);
+      }
+      st.setCombo(0);
+      this.updateMix();
+    } else this.practiceStep = 0;
+    st.feedback(j);
+  }
+
   /** Feed the learning model once a challenge is fully over. */
   private onResolved(c: Challenge, now: number): void {
-    if (c.spec.echo && c.scored && !c.demo) {
-      this.stats.echoRounds++;
-      if (c.options.every((o) => o.state === 'hit')) this.stats.echoClean++;
+    if (c.scored && !c.demo) {
+      if (c.spec.echo) {
+        this.stats.echoRounds++;
+        if (c.options.every((o) => o.state === 'hit')) this.stats.echoClean++;
+      }
+      for (const o of c.options) {
+        if (o.kind !== 'hold') continue;
+        this.stats.holdsTotal++;
+        if (o.state === 'hit') this.stats.holdsClean++;
+      }
     }
     if (!c.scored || c.demo) return;
     // Mashing is not "knowing it": more presses than tokens (+1 slack) counts as a guess.
@@ -812,6 +940,7 @@ export class Game {
     for (const tv of engine.pollVisual(now)) this.onVisual(tv);
     const { judgements, resolved } = judge.update(now);
     for (const j of judgements) this.apply(j);
+    for (const j of judge.updateHold(now, this.keyDown)) this.applyHold(j);
     for (const c of resolved) this.onResolved(c, now);
     this.bot?.tick(now);
     this.ui.stage.render(now, engine);

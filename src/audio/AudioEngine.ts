@@ -1,4 +1,4 @@
-import type { JingleKind } from '../rhythm/types';
+import type { JingleKind, SoundHandle } from '../rhythm/types';
 
 const mtof = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
 const PENTA = [0, 2, 4, 7, 9];
@@ -299,6 +299,36 @@ export class AudioEngine {
     const o = this.osc('sine', 250 * p, t, t + 0.3, g);
     o.frequency.exponentialRampToValueAtTime(150 * p, t + 0.1);
     this.noise(t, 0.03, 0.28 * v, 'bandpass', offbeat ? 3200 : 1800, 1.2, this.sfx);
+  }
+
+  /**
+   * The player's own sustained voice: a real plateau (what `vca()` cannot do,
+   * it always decays), so the ear hears "I am holding" instead of a beep.
+   * The handle lets a broken hold be cut off mid-note.
+   */
+  holdNote(t: number, dur: number, midi: number): SoundHandle {
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.Q.value = 3;
+    f.frequency.setValueAtTime(400, t);
+    f.frequency.exponentialRampToValueAtTime(2200, t + 0.12);
+    f.frequency.exponentialRampToValueAtTime(900, t + dur);
+    const g = this.ctx.createGain();
+    const plateau = Math.max(t + 0.03, t + dur - 0.06);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+    g.gain.setValueAtTime(0.22, plateau);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    f.connect(g).connect(this.sfx);
+    this.osc('sawtooth', mtof(midi), t, t + dur + 0.06, f);
+    this.osc('sine', mtof(midi - 12), t, t + dur + 0.06, f);
+    return {
+      cut: (at: number): void => {
+        const a = Math.max(at, this.ctx.currentTime);
+        g.gain.cancelScheduledValues(a);
+        g.gain.setTargetAtTime(0.0001, a, 0.01);
+      },
+    };
   }
 
   drumMiss(t: number): void {

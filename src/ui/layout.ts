@@ -54,5 +54,7 @@ export function applyLayout(next: Layout, stage: HTMLElement): boolean {
 export const TOUCH = window.matchMedia('(pointer: coarse)').matches;
 
 export function inputWord(text: string): string {
-  return TOUCH ? text.replace(/ESPACIO/g, 'TOCA') : text;
+  if (!TOUCH) return text;
+  // "mantén ESPACIO" first: the generic rule would turn it into "mantén TOCA".
+  return text.replace(/mantén ESPACIO/g, 'mantén el dedo').replace(/ESPACIO/g, 'TOCA');
 }

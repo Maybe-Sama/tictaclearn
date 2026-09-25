@@ -119,6 +119,7 @@ export interface ResultsData {
   newBest: boolean;
   /** Call and response: rounds played and rounds repeated without a slip. */
   echo: { rounds: number; clean: number };
+  hold: { total: number; clean: number };
   mastered: LearningItem[];
   weak: LearningItem[];
 }
@@ -159,7 +160,7 @@ export class ResultsScreen {
             ${bubble('Good', String(d.good), '#16C2A3', 3)}
             ${bubble('Miss', String(d.miss), '#FF5D8F', 4)}
           </div>
-          <p class="rs-score">${d.score.toLocaleString('es-ES')} pts · racha perfect ${d.bestStreak}${d.echo.rounds ? ` · eco ${d.echo.clean}/${d.echo.rounds}` : ''}${d.fevers ? ` · FEVER ×${d.fevers}` : ''}${d.newBest ? ' · <em>¡NUEVO RÉCORD!</em>' : ''}</p>
+          <p class="rs-score">${d.score.toLocaleString('es-ES')} pts · racha perfect ${d.bestStreak}${d.echo.rounds ? ` · eco ${d.echo.clean}/${d.echo.rounds}` : ''}${d.hold.total ? ` · sostén ${d.hold.clean}/${d.hold.total}` : ''}${d.fevers ? ` · FEVER ×${d.fevers}` : ''}${d.newBest ? ' · <em>¡NUEVO RÉCORD!</em>' : ''}</p>
         </div>
         <div class="rs-right">
           <h3>Las que ya dominas</h3>

@@ -28,6 +28,9 @@ export class SessionStats {
   /** Call-and-response rounds played and how many were clean. */
   echoRounds = 0;
   echoClean = 0;
+  /** Holds offered and how many were sustained all the way to the tail. */
+  holdsTotal = 0;
+  holdsClean = 0;
   private timingPts = 0;
   private timingN = 0;
 
