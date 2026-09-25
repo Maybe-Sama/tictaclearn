@@ -1,6 +1,7 @@
 import { CONTINENTS } from '../content/countries';
 import type { ContentPack } from '../content/types';
 import type { Progress } from '../game/Progress';
+import { ARCHETYPE_COPY } from '../game/archetypes';
 import type { ConcertDef, StageDef } from '../game/Tour';
 
 const shuffled = <T>(a: T[]): T[] => [...a].sort(() => Math.random() - 0.5);
@@ -126,17 +127,23 @@ export class TourScreen {
       .map((c, i) => {
         const rec = progress.concert(pack.id, c.id);
         const flags = (c.newIds.length ? c.newIds : c.poolIds).slice(0, 5).map((id) => pack.renderPrompt(pack.byId(id))).join('');
-        return `<button type="button" class="stop${c.final ? ' final' : ''}${rec?.passed ? ' done' : ''}${i === this.focus ? ' focus' : ''}" data-act="concert" data-i="${i}" style="--sc:${stage.color}">
+        const copy = ARCHETYPE_COPY[c.params.archetype];
+        return `<button type="button" class="stop arch-${copy.css}${c.final ? ' final' : ''}${rec?.passed ? ' done' : ''}${i === this.focus ? ' focus' : ''}" data-act="concert" data-i="${i}" style="--sc:${stage.color}">
           <span class="stop-num">${c.final ? '♛' : i + 1}</span>
+          <span class="stop-arch">${copy.badge}</span>
           <span class="stop-title">${c.theme ?? c.title}</span>
           ${stars(rec?.stars ?? 0)}
           <span class="stop-flags">${flags}</span>
         </button>`;
       })
       .join('');
+    // The rule of the concert you are on: the map says what kind of concert it is
+    // before you press play, which is half of "no mechanic without a warning".
+    const here = stage.concerts[this.focus] ?? stage.concerts[0];
+    const rule = here ? ARCHETYPE_COPY[here.params.archetype] : null;
     this.root.innerHTML = `${this.head(stage.name, 'ZONAS')}
       <div class="stops">${grid}</div>
-      <p class="hub-hint">Supera cada concierto reconociendo el 70 %. La 3.ª estrella necesita, además, ir a ritmo.</p>`;
+      <p class="hub-hint">${rule ? `<b>${rule.badge}</b> · ${rule.rule}` : 'Supera cada concierto reconociendo el 70 %.'}</p>`;
   }
 }
 

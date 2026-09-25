@@ -86,7 +86,12 @@ export function archetypeFor(stageId: string, index: number, final: boolean, new
   return a === 'escuela' && newCount === 0 ? 'eco' : a;
 }
 
-/** Tempo bias per archetype: the fantasy sets the pulse (§3.4). */
+/**
+ * Tempo bias per archetype: the fantasy sets the pulse (§3.4). The design asked
+ * for JEFE +2 and it gets it from `final ? 2 : 0` below — adding it twice would
+ * push the last concerts past 120 BPM, where the reading gap of `quick` stops
+ * being fair.
+ */
 const BPM_BIAS: Record<ArchetypeId, number> = { escuela: 0, carrera: 4, eco: -2, memoria: 0, desfile: -4, jefe: 0 };
 
 const STAGE_GROOVE: Record<string, GrooveId> = { europa: 'easy', sudamerica: 'new', norteamerica: 'mix', africa: 'dembow', asia: 'mix', oceania: 'new', mundo: 'final' };
