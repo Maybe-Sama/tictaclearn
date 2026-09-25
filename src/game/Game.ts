@@ -14,6 +14,7 @@ import { preloadFlags } from '../content/flags';
 import { setVoice, silence, voiceEnabled } from '../util/voice';
 import { Rng, randomSeed } from '../util/rng';
 import { Progress } from './Progress';
+import { ARCHETYPE_COPY } from './archetypes';
 import { buildTour, nextConcert, starsFor, type ArchetypeId, type ConcertDef, type StageDef } from './Tour';
 import type { Stage } from '../ui/Stage';
 import { loadBest, loadDifficulty, loadOffset, loadSubject, saveBest, saveDifficulty, saveOffset, saveSubject } from '../util/storage';
@@ -361,7 +362,11 @@ export class Game {
     const tracker = new LearningTracker(pool, this.rng.fork('tracker'));
     tracker.boost(weak);
     const depth = c.stage.index / 6;
-    const plan: SessionPlan = { title: c.stage.name, sub: c.theme ?? c.title, pill: `${c.stage.name} · ${c.final ? 'FINAL' : c.index + 1}`, newItems, pool, params: c.params, final: c.final, depth };
+    // The theme of a Gira Mundial concert wins: it is unique content, and by then
+    // the player knows the six archetypes. Everywhere else the subtitle is the
+    // archetype's rule; the concert number stays in the HUD pill (ROLLOUT §1.4).
+    const sub = c.theme ?? ARCHETYPE_COPY[c.params.archetype].sub;
+    const plan: SessionPlan = { title: c.stage.name, sub, pill: `${c.stage.name} · ${c.final ? 'FINAL' : c.index + 1}`, newItems, pool, params: c.params, final: c.final, depth };
     this.launch(tracker, { level: 1, skipTutorial: true, plan }, newItems.length ? GameState.TeachNewFlags : GameState.MixGroove);
   }
 
@@ -425,7 +430,13 @@ export class Game {
     this.dd = new DifficultyDirector(this.diff, this.deterministic);
     const cg = new ChallengeGenerator(this.tracker, this.pack.items, this.rng.fork('challenges'));
     this.cg = cg;
-    this.setlist = new Setlist(this.pack, cg, this.dd, this.diff, this.rng.fork('setlist'), opts);
+    // A primitive is taught once in a lifetime, not once per session: the setlist
+    // asks `Progress` whether the player already met the echo or the hold.
+    this.setlist = new Setlist(this.pack, cg, this.dd, this.diff, this.rng.fork('setlist'), {
+      ...opts,
+      taught: (p) => this.progress.knows(p),
+      onTaught: (p) => this.progress.teach(p),
+    });
     if (this.bot) this.bot.rng = this.rng.fork('bot');
     this.debugQueue = [];
     this.keyDown = false;

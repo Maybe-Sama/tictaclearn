@@ -12,6 +12,10 @@
  * El punto 2 es el que se perdió dos veces al reaplicar ediciones: sin él las
  * estadísticas de resultados mienten y el eco es invisible para el director de
  * dificultad.
+ *
+ * Y la regla inversa, que es la que le da sentido a la insignia del mapa: un
+ * concierto que NO es de eco no emite ni una ronda. Mientras el eco salía en
+ * todos, la insignia ECO prometía algo que hacía el concierto de al lado.
  */
 
 const { Report, VIEWPORTS, launchBrowser, openGame, state } = require('./common.cjs');
@@ -19,12 +23,19 @@ const { Report, VIEWPORTS, launchBrowser, openGame, state } = require('./common.
 const SEED = 4242;
 const ROUND_TIMEOUT = 120000;
 
-/** Arranca el primer concierto del tour sin pasar por los menús. */
-const startFirstConcert = (page) =>
-  page.evaluate(() => {
+/**
+ * Arranca, sin pasar por los menús, el primer concierto del tour que cumpla el
+ * predicado (por arquetipo, no por posición: el reparto puede moverse).
+ */
+const startConcertWhere = (page, echo) =>
+  page.evaluate((wantEcho) => {
     const g = window.__wb;
-    g.startConcert(g.tour()[0].concerts[0]);
-  });
+    const all = g.tour().flatMap((s) => s.concerts);
+    const c = all.find((x) => !!x.params.echo === wantEcho);
+    if (!c) throw new Error(`no hay ningún concierto con echo=${wantEcho}`);
+    g.startConcert(c);
+    return { id: c.id, archetype: c.params.archetype };
+  }, echo);
 
 /**
  * Juega hasta que se hayan contado `rounds` ecos (o hasta resultados) y devuelve
@@ -61,6 +72,28 @@ async function watchConcert(page, wanted) {
   return { ...seen, ...stats };
 }
 
+/** Drena un concierto entero hasta resultados, contando lo mismo que `watchConcert`. */
+async function watchToResults(page) {
+  const deadline = Date.now() + ROUND_TIMEOUT;
+  let last = { call: 0, answer: 0, rounds: 0 };
+  while (Date.now() < deadline) {
+    const snap = await page.evaluate(() => {
+      const g = window.__wb;
+      const log = g.engine ? g.engine.phraseLog || [] : [];
+      return {
+        st: g.fsm.state,
+        call: log.filter((l) => l.startsWith('echo-call')).length,
+        answer: log.filter((l) => l.startsWith('echo-answer')).length,
+        rounds: g.stats.echoRounds,
+      };
+    });
+    last = { call: snap.call, answer: snap.answer, rounds: snap.rounds };
+    if (snap.st === 'Results') break;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return last;
+}
+
 async function run() {
   const browser = await launchBrowser();
   const rep = new Report('echo');
@@ -71,7 +104,8 @@ async function run() {
     const page = await openGame(browser, { viewport: VIEWPORTS.desktop, query: `autoplay=good&seed=${SEED}` });
     let good;
     try {
-      await startFirstConcert(page);
+      const where = await startConcertWhere(page, true);
+      console.log(`  concierto ${where.id} (${where.archetype})`);
       good = await watchConcert(page, 2);
       rep.check(good.call >= 2 && good.answer >= 2, `el concierto incluye llamada y respuesta (${good.call} llamadas / ${good.answer} respuestas)`, [
         'el descanso del setlist debería producir dos rondas de eco',
@@ -96,7 +130,7 @@ async function run() {
     console.log(`\n  sin tocar nada · semilla ${SEED}`);
     const idlePage = await openGame(browser, { viewport: VIEWPORTS.desktop, query: `seed=${SEED}` });
     try {
-      await startFirstConcert(idlePage);
+      await startConcertWhere(idlePage, true);
       const idle = await watchConcert(idlePage, 2);
       rep.check(idle.rounds >= 2, `las rondas cuentan aunque no se toque (${idle.rounds})`, [`estado final: ${await state(idlePage)}`]);
       rep.check(idle.clean === 0, `ninguna ronda sale limpia sin tocar (${idle.clean})`, [
@@ -104,6 +138,22 @@ async function run() {
       ]);
     } finally {
       await idlePage.close();
+    }
+
+    // --- y el concierto que no es de eco: ni una ronda ----------------------
+    console.log(`\n  un concierto que no es de ECO · semilla ${SEED}`);
+    const plainPage = await openGame(browser, { viewport: VIEWPORTS.desktop, query: `autoplay=good&seed=${SEED}` });
+    try {
+      const where = await startConcertWhere(plainPage, false);
+      const plain = await watchToResults(plainPage);
+      rep.check(
+        plain.call === 0 && plain.answer === 0,
+        `${where.id} (${where.archetype}) no emite ninguna frase de eco (${plain.call}/${plain.answer})`,
+        ['el eco solo lo emiten los conciertos con params.echo: si no, la insignia ECO no promete nada'],
+      );
+      rep.check(plain.rounds === 0, `tampoco cuenta rondas (${plain.rounds})`);
+    } finally {
+      await plainPage.close();
     }
   } finally {
     await browser.close();
