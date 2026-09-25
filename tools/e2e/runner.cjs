@@ -16,11 +16,12 @@ const { green, red } = require('./common.cjs');
 const TESTS = {
   content: { file: './content.cjs', browser: false, what: 'datos de src/content/countries.ts' },
   flow: { file: './flow.cjs', browser: true, what: 'recorrido de menús hasta resultados' },
+  tour: { file: './tour.cjs', browser: false, what: 'reparto de arquetipos del Beat Tour' },
   echo: { file: './echo.cjs', browser: true, what: 'llamada y respuesta: rondas, limpieza y animación' },
   timing: { file: './timing.cjs', browser: true, what: 'tambores en su beat con CPU x4' },
   layout: { file: './layout.cjs', browser: true, what: 'textos que no desbordan su caja' },
 };
-const DEFAULT_ORDER = ['content', 'flow', 'echo', 'timing', 'layout'];
+const DEFAULT_ORDER = ['content', 'tour', 'flow', 'echo', 'timing', 'layout'];
 
 function parseArgs(argv) {
   const names = [];

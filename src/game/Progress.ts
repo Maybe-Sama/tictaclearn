@@ -5,6 +5,9 @@ import type { Outcome } from './LearningTracker';
  * - Beat Tour concerts: stars and pass state.
  * - Mastery per country: a Leitner box (0..5). Right answers move it up,
  *   misses move it down; low boxes and long-unseen items come back first.
+ * - Mechanics already taught (ECO, SOSTÉN). These are not content, so they are
+ *   kept outside the per-subject data: you learn to hold a note once, not once
+ *   per subject.
  */
 export interface ConcertRecord {
   stars: number;
@@ -25,10 +28,15 @@ interface SubjectData {
 
 export type MasteryLevel = 'nuevo' | 'aprendiendo' | 'dominado';
 
+/** A verb the player has to be taught the first time it shows up. */
+export type PrimitiveId = 'echo' | 'hold';
+
 const KEY = 'worldbeat.progress.v1';
+const PRIMITIVES_KEY = 'worldbeat.primitives.v1';
 
 export class Progress {
   private data: Record<string, SubjectData> = {};
+  private taught = new Set<PrimitiveId>();
 
   constructor() {
     try {
@@ -36,6 +44,28 @@ export class Progress {
       if (raw) this.data = JSON.parse(raw);
     } catch {
       this.data = {};
+    }
+    try {
+      const raw = localStorage.getItem(PRIMITIVES_KEY);
+      if (raw) for (const p of JSON.parse(raw) as PrimitiveId[]) this.taught.add(p);
+    } catch {
+      /* nothing learned yet, as far as we can tell */
+    }
+  }
+
+  /** Was this mechanic already taught, in any session? */
+  knows(p: PrimitiveId): boolean {
+    return this.taught.has(p);
+  }
+
+  /** Remember that its tutorial already played, so it never plays twice. */
+  teach(p: PrimitiveId): void {
+    if (this.taught.has(p)) return;
+    this.taught.add(p);
+    try {
+      localStorage.setItem(PRIMITIVES_KEY, JSON.stringify([...this.taught]));
+    } catch {
+      /* private mode: the tutorial may come back next session */
     }
   }
 
@@ -108,8 +138,15 @@ export class Progress {
     return ids.reduce((n, id) => n + (this.concert(subject, id)?.stars ?? 0), 0);
   }
 
+  /** Starting a subject over also brings the tutorials back: it is a fresh player. */
   reset(subject: string): void {
     this.data[subject] = { concerts: {}, mastery: {} };
+    this.taught.clear();
+    try {
+      localStorage.removeItem(PRIMITIVES_KEY);
+    } catch {
+      /* nothing to clear */
+    }
     this.save();
   }
 }
