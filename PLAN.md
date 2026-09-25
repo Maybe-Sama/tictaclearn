@@ -156,6 +156,24 @@ prototipo a 25/09/2026, medido sobre el código, no sobre intenciones:
 
 ---
 
+## 3bis. Estado de implementación
+
+Se actualiza a medida que aterriza cada pieza. Lo que no tiene evidencia medida no cuenta
+como hecho.
+
+| Pieza | Estado | Evidencia |
+|---|---|---|
+| Fase 0.1 · `Rng` con semilla inyectado (retos, setlist, música, tracker, bot) | **hecho** | `src/util/rng.ts`; `fork(label)` derivado de la semilla, no del estado consumido |
+| Fase 0.2 · arnés `tools/e2e` en el repositorio + CI | **hecho** | `npm run verify`; `.github/workflows/verify.yml`; 6 pruebas |
+| Fase 0.3 · validador de contenido | **hecho** | `tools/e2e/content.cjs` |
+| Fase 1.5 · primitiva **ECO** | **hecho** | 2 rondas por concierto; bot perfecto 2/2 limpias, jugador inmóvil 2 rondas y 0 limpias (`tools/e2e/echo.cjs`) |
+| Fase 1.6a · reparto de arquetipos (`Tour.ts`) | **hecho** | 18/10/9/9/7/7 sobre 60 conciertos; regla de variedad verificada en banderas y capitales (`tools/e2e/tour.cjs`) |
+| Fase 1.6a · arreglo del fallo de la rampa | **hecho** | `quick` y `flash` ya existen en Europa; antes ninguno se activaba (p ≤ 0,136 frente a umbrales 0,25 y 0,40) |
+| Fase 1.6b · los seis cuerpos de concierto en `Setlist.ts` | en curso | — |
+| Fase 1.4 · primitiva **HOLD** (motor) | en curso | — |
+| Fase 1.6c · insignia del arquetipo en el mapa | pendiente | — |
+| Fase 1.7 · ajuste de curva con jugadores reales | pendiente | necesita las dos primitivas en el móvil |
+
 ## 4. Plan revisado
 
 ### Fase 0 — Cimientos invisibles (3–5 días)
